@@ -219,13 +219,16 @@ class ShardService {
       characterName
     };
 
+    // Update memory state first
+    this.currentSelection = selection;
+
     try {
       await dbService.add('shards', { id: 'current_selection', ...selection });
-      this.currentSelection = selection;
       return true;
     } catch (error) {
-      console.error('[ShardService] Failed to save selection:', error);
-      return false;
+      console.error('[ShardService] Failed to save selection to DB, but proceeding in memory:', error);
+      // Return true anyway so user can play
+      return true;
     }
   }
 

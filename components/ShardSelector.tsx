@@ -25,7 +25,16 @@ export const ShardSelector: React.FC<ShardSelectorProps> = ({ onSelect, username
     // Инициализация и загрузка шардов
     const loadShards = async () => {
       await shardService.init();
-      setShards(shardService.getShards());
+      const loadedShards = shardService.getShards();
+      setShards(loadedShards);
+      
+      // Если шарды загружены, автоматически выбираем первый доступный
+      const availableShard = loadedShards.find(
+        s => s.status === 'online' && s.population < s.maxPopulation
+      );
+      if (availableShard && !selectedShard) {
+        setSelectedShard(availableShard.id);
+      }
     };
     loadShards();
 
@@ -259,7 +268,7 @@ export const ShardSelector: React.FC<ShardSelectorProps> = ({ onSelect, username
       </div>
 
       {/* Нижняя панель */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-gray-900/95 to-transparent py-6 px-8">
+      <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-gray-900/95 to-transparent py-6 px-8">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           {/* Информация о выбранном шарде */}
           <div className="flex-1">
@@ -283,11 +292,11 @@ export const ShardSelector: React.FC<ShardSelectorProps> = ({ onSelect, username
           {/* Кнопка подключения */}
           <button
             onClick={handleConnect}
-            disabled={!selectedShard || isConnecting}
+            disabled={!selectedShard || isConnecting || shards.length === 0}
             className={`
               px-8 py-3 rounded-lg font-bold text-lg transition-all
-              ${selectedShard && !isConnecting
-                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/30'
+              ${selectedShard && !isConnecting && shards.length > 0
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/30 cursor-pointer'
                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
               }
             `}
@@ -300,6 +309,10 @@ export const ShardSelector: React.FC<ShardSelectorProps> = ({ onSelect, username
                 </svg>
                 Подключение...
               </span>
+            ) : shards.length === 0 ? (
+              'Загрузка серверов...'
+            ) : !selectedShard ? (
+              'Выберите сервер'
             ) : (
               '🚀 Подключиться'
             )}
