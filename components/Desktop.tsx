@@ -16,8 +16,7 @@ import { InventoryApp } from './InventoryApp';
 import { SettingsApp } from './SettingsApp';
 import { BankApp } from './BankApp';
 import { StorageApp } from './StorageApp';
-import { BlueprintsApp } from './BlueprintsApp';
-import { CorporationsApp } from './CorporationsApp';
+import { ProfileApp } from './ProfileApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -266,9 +265,8 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'skills', type: 'app', title: 'Skills', icon: '🧠', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 2, appId: 'skills' },
     { id: 'music', type: 'app', title: 'WinAmp', icon: '🎵', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 3, appId: 'music' },
     { id: 'leaderboard', type: 'app', title: 'Ranking', icon: '🏆', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y, appId: 'leaderboard' },
-    // LAYER 5/7: Blueprints & Corporations
-    { id: 'blueprints', type: 'app', title: 'Чертежи', icon: '📜', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'blueprints' },
-    { id: 'corporations', type: 'app', title: 'Корпорации', icon: '🏢', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H, appId: 'corporations' },
+    // Profile - единый центр с чертежами, корпорациями, статистикой
+    { id: 'profile', type: 'app', title: 'Профиль', icon: '👤', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'profile' },
     // System folder shortcuts - open StorageApp with initial path
     { id: 'folder-projects', type: 'folder', title: 'Проекты', icon: '📂', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H, appId: 'devfs' },
     { id: 'folder-sites', type: 'folder', title: 'Сайты', icon: '🌐', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'devfs' },
@@ -880,37 +878,12 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
         {activeApp === 'bank' && !minimized.includes('bank') && (
             <BankApp state={props.state} onClose={() => toggleApp('bank')} onPayBill={props.onPayBill} onTakeLoan={props.onTakeLoan} onRepayLoan={props.onRepayLoan} />
         )}
-        {activeApp === 'blueprints' && !minimized.includes('blueprints') && (
-            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-green-900">
-                <div className="h-8 bg-black border-b border-green-900 flex items-center justify-between px-3">
-                    <span className="text-xs font-bold text-green-400">📜 Чертежи</span>
-                    <div className="flex gap-2">
-                        <button onClick={() => setMinimized(p => [...p, 'blueprints'])} className="w-3 h-3 rounded-full bg-yellow-500"></button>
-                        <button onClick={() => toggleApp('blueprints')} className="w-3 h-3 rounded-full bg-red-500"></button>
-                    </div>
-                </div>
-                <div className="flex-1">
-                    <BlueprintsApp 
-                        blueprints={props.state.blueprints || []} 
-                        money={props.state.money}
-                        onAddBlueprint={props.onAddBlueprint}
-                    />
-                </div>
-            </div>
-        )}
-        {activeApp === 'corporations' && !minimized.includes('corporations') && (
-            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-green-900">
-                <div className="h-8 bg-black border-b border-green-900 flex items-center justify-between px-3">
-                    <span className="text-xs font-bold text-green-400">🏢 Корпорации</span>
-                    <div className="flex gap-2">
-                        <button onClick={() => setMinimized(p => [...p, 'corporations'])} className="w-3 h-3 rounded-full bg-yellow-500"></button>
-                        <button onClick={() => toggleApp('corporations')} className="w-3 h-3 rounded-full bg-red-500"></button>
-                    </div>
-                </div>
-                <div className="flex-1">
-                    <CorporationsApp corporationReps={props.state.corporationReps || []} />
-                </div>
-            </div>
+        {activeApp === 'profile' && !minimized.includes('profile') && (
+            <ProfileApp 
+                state={props.state} 
+                onClose={() => toggleApp('profile')}
+                onAddBlueprint={props.onAddBlueprint}
+            />
         )}
         {activeApp === 'settings' && !minimized.includes('settings') && (
             <SettingsApp onClose={() => toggleApp('settings')} onLogout={props.onExit} username={props.state.username} currentLanguage={props.state.language} onSetLanguage={props.onSetLanguage} />
