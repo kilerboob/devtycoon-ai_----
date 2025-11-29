@@ -1,0 +1,3 @@
+- [ ] Update PostgreSQL password in backend/.env to correct value (553837)
+- [ ] Verify DB connection by running setupDb script
+- [ ] Run server and test API endpoints

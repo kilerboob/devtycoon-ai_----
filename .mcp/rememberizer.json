@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "rememberizer": {
+      "command": "npx",
+      "args": [
+        "mcp-rememberizer-vectordb"
+      ],
+      "env": {
+        "REMEMBERIZER_DB_DIR": "./vectordb",
+        "MEMORY_BANK_DIR": "./memory-bank",
+        "EMBED_MODEL": "text-embedding-3-large"
+      }
+    }
+  }
+}

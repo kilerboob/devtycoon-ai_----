@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevTycoon AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            code: {
+              bg: '#0f172a', // slate-900
+              term: '#1e293b', // slate-800
+              accent: '#22c55e', // green-500
+              error: '#ef4444', // red-500
+              warn: '#eab308', // yellow-500
+            }
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', "Liberation Mono", "Courier New", 'monospace'],
+            digital: ['Courier New', 'monospace'], // Fallback for digital clock
+          },
+          animation: {
+            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'crt-flicker': 'flicker 0.15s infinite',
+            'float-up': 'floatUp 0.8s ease-out forwards',
+            'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
+            'scanline': 'scanline 8s linear infinite',
+            'rgb-wave': 'rgbWave 3s linear infinite',
+            'spin-slow': 'spin 3s linear infinite',
+            'fade-in-up': 'fadeInUp 1s ease-out',
+          },
+          keyframes: {
+            flicker: {
+              '0%': { opacity: '0.97' },
+              '100%': { opacity: '1' },
+            },
+            floatUp: {
+              '0%': { transform: 'translateY(0) scale(1)', opacity: '1' },
+              '100%': { transform: 'translateY(-30px) scale(1.2)', opacity: '0' },
+            },
+            shake: {
+              '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+              '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+              '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+              '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+            },
+            scanline: {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(100%)' }
+            },
+            rgbWave: {
+              '0%': { backgroundColor: '#ef4444' },
+              '25%': { backgroundColor: '#eab308' },
+              '50%': { backgroundColor: '#22c55e' },
+              '75%': { backgroundColor: '#3b82f6' },
+              '100%': { backgroundColor: '#ef4444' }
+            },
+            fadeInUp: {
+              '0%': { opacity: '0', transform: 'translateY(30px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #000;
+      color: #e2e8f0;
+      overflow: hidden;
+      /* Prevent body scroll, handle in app */
+    }
+
+    /* Custom Scrollbar for Terminal */
+    .terminal-scroll::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .terminal-scroll::-webkit-scrollbar-track {
+      background: rgba(30, 41, 59, 0.5);
+    }
+
+    .terminal-scroll::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+
+    .terminal-scroll::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+
+    .crunch-mode {
+      box-shadow: 0 0 50px rgba(220, 38, 38, 0.3) inset;
+      animation: crunch-border 2s infinite;
+    }
+
+    @keyframes crunch-border {
+      0% {
+        border-color: #ef4444;
+      }
+
+      50% {
+        border-color: #7f1d1d;
+      }
+
+      100% {
+        border-color: #ef4444;
+      }
+    }
+
+    /* Matrix Canvas */
+    #matrix-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      opacity: 0.6;
+      /* Increased visibility significantly */
+    }
+
+    /* CRT Effects */
+    .crt-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.6) 100%);
+      pointer-events: none;
+      z-index: 40;
+    }
+
+    .scanlines {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to bottom,
+          rgba(255, 255, 255, 0),
+          rgba(255, 255, 255, 0) 50%,
+          rgba(0, 0, 0, 0.1) 50%,
+          rgba(0, 0, 0, 0.1));
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 41;
+      opacity: 0.6;
+    }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body>
+  <div id="root"></div>
+  <div class="crt-overlay"></div>
+  <div class="scanlines"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
+</html>

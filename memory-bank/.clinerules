@@ -1,0 +1,21 @@
+# .clinerules
+
+## Command Ritual
+1. Start every session with "follow your custom instructions" in Cursor and wait for the MCP listing to finish.
+2. Run "read memory bank" to pull the latest core docs (projectbrief, productContext, systemPatterns, techContext, activeContext, progress, roadmap, schema, REDMAP, and AI rules).
+3. If semantic or lore context is missing, run "search memory" (Rememberizer). For framework/API questions, run "use context7" and cite the returned doc IDs.
+
+## Documentation Discipline
+- Update progress.md and activeContext.md whenever a task affects ?25 percent of a feature or introduces a new pattern.
+- Record non-obvious implementation constraints, CLI preferences, or testing gotchas inside this .clinerules file.
+- Keep references to REDMAP layers, DB tables, and app components so reviewers can trace impact quickly.
+
+## Development Workflow
+- Use DevFsTester after modifying DevFS internals; keep tests (devFsService/devFsRecursive/devFsHeavyLoad/FileTreeInlineRename) in sync.
+- Respect sharded DB schema (backend/database-schema.md) and never invent fields that are not defined there.
+- When touching Desktop/apps, validate interactions across ProjectsApp, StorageApp, Browser, and Terminal to avoid breaking OS cohesion.
+
+## Deployment & Tools
+- setup-unified-memory.ps1/.sh must be rerun whenever MCP endpoints change; verify with the three MCP commands listed above.
+- Keep Rememberizer/Context7 API keys in environment variables and never commit them.
+- Document any manual steps (e.g., seeding DevFS, migrating IndexedDB) inside activeContext.md so future tasks can reuse them.

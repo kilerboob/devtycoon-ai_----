@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "memory-bank": {
+      "command": "npx",
+      "args": [
+        "memory-bank-mcp"
+      ],
+      "env": {
+        "MEMORY_BANK_DIR": "./memory-bank"
+      }
+    }
+  }
+}
