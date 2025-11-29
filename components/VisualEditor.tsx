@@ -1,13 +1,16 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { GraphNode, GraphConnection, VisualNodeType, ProgrammingLanguage } from '../types';
 import { compileToLanguage } from '../utils/visualCompiler';
+import { projectGraphService, ProjectGraph, ProjectMeta } from '../services/projectGraphService';
 
 interface VisualEditorProps {
     nodes: GraphNode[];
     connections: GraphConnection[];
     onChange: (nodes: GraphNode[], connections: GraphConnection[]) => void;
     language: ProgrammingLanguage;
+    projectId?: string; // Optional: if provided, enables DevFS integration
+    onProjectChange?: (project: ProjectGraph) => void;
 }
 
 const CATEGORIES = {
@@ -48,12 +51,113 @@ const NODE_DEFS: Record<VisualNodeType, { label: string, color: string, inputs: 
     io_input: { label: 'Input', color: 'bg-cyan-700', inputs: 0, outputs: ['flow'] },
 };
 
-export const VisualEditor: React.FC<VisualEditorProps> = ({ nodes, connections, onChange, language }) => {
+export const VisualEditor: React.FC<VisualEditorProps> = ({ nodes, connections, onChange, language, projectId, onProjectChange }) => {
     const [draggingNode, setDraggingNode] = useState<string | null>(null);
     const [connectingNode, setConnectingNode] = useState<{id: string, handle: string} | null>(null);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [previewCode, setPreviewCode] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const [showVersions, setShowVersions] = useState(false);
+    const [versions, setVersions] = useState<Array<{id: string, timestamp: number, content: string}>>([]);
+    const [showProjectList, setShowProjectList] = useState(false);
+    const [projects, setProjects] = useState<ProjectMeta[]>([]);
+    const [currentProject, setCurrentProject] = useState<ProjectGraph | null>(null);
     const editorRef = useRef<HTMLDivElement>(null);
+    const autosaveRef = useRef<number | null>(null);
+
+    // Initialize project if projectId is provided
+    useEffect(() => {
+        if (projectId) {
+            loadProject(projectId);
+        }
+        return () => {
+            if (autosaveRef.current) {
+                clearInterval(autosaveRef.current);
+            }
+        };
+    }, [projectId]);
+
+    // Autosave every 30 seconds
+    useEffect(() => {
+        if (currentProject && nodes.length > 0) {
+            if (autosaveRef.current) {
+                clearInterval(autosaveRef.current);
+            }
+            autosaveRef.current = window.setInterval(() => {
+                handleSave();
+            }, 30000);
+        }
+        return () => {
+            if (autosaveRef.current) {
+                clearInterval(autosaveRef.current);
+            }
+        };
+    }, [currentProject, nodes, connections]);
+
+    const loadProject = async (id: string) => {
+        const project = await projectGraphService.loadProject(id);
+        if (project) {
+            setCurrentProject(project);
+            onChange(project.nodes, project.connections);
+            onProjectChange?.(project);
+        }
+    };
+
+    const handleSave = useCallback(async () => {
+        if (!currentProject) return;
+        setIsSaving(true);
+        try {
+            const updatedProject: ProjectGraph = {
+                ...currentProject,
+                nodes,
+                connections,
+                updatedAt: Date.now(),
+            };
+            await projectGraphService.saveProject(updatedProject);
+            
+            // Also save generated code
+            const code = compileToLanguage(nodes, connections, language);
+            const ext = language === 'javascript' ? 'js' : language === 'python' ? 'py' : language;
+            await projectGraphService.saveGeneratedCode(currentProject.id, `main.${ext}`, code);
+            
+            setCurrentProject(updatedProject);
+            setLastSaved(new Date());
+        } catch (e) {
+            console.error('Failed to save project:', e);
+        } finally {
+            setIsSaving(false);
+        }
+    }, [currentProject, nodes, connections, language]);
+
+    const loadVersions = async () => {
+        if (!currentProject) return;
+        const vers = await projectGraphService.getFileVersions(currentProject.id);
+        setVersions(vers);
+        setShowVersions(true);
+    };
+
+    const restoreVersion = async (versionId: string) => {
+        if (!currentProject) return;
+        await projectGraphService.restoreVersion(currentProject.id, 'graph.json', versionId);
+        await loadProject(currentProject.id);
+        setShowVersions(false);
+    };
+
+    const loadProjectList = async () => {
+        const list = await projectGraphService.listProjects();
+        setProjects(list);
+        setShowProjectList(true);
+    };
+
+    const createNewProject = async () => {
+        const name = prompt('Имя нового проекта:');
+        if (!name) return;
+        const project = await projectGraphService.createProject(name, language);
+        setCurrentProject(project);
+        onChange([], []);
+        setShowProjectList(false);
+    };
 
     // Update code preview
     useEffect(() => {
@@ -134,8 +238,113 @@ export const VisualEditor: React.FC<VisualEditorProps> = ({ nodes, connections, 
 
     return (
         <div className="flex w-full h-full bg-[#111]">
+            {/* Project List Modal */}
+            {showProjectList && (
+                <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center" onClick={() => setShowProjectList(false)}>
+                    <div className="bg-slate-800 rounded-lg p-4 w-96 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-white">📁 Проекты</h3>
+                            <button onClick={() => setShowProjectList(false)} className="text-slate-400 hover:text-white">✕</button>
+                        </div>
+                        <button 
+                            onClick={createNewProject}
+                            className="w-full mb-4 py-2 bg-green-600 hover:bg-green-500 rounded text-white text-sm font-bold"
+                        >
+                            + Новый проект
+                        </button>
+                        <div className="space-y-2">
+                            {projects.map(p => (
+                                <div 
+                                    key={p.id}
+                                    onClick={() => { loadProject(p.id); setShowProjectList(false); }}
+                                    className="p-3 bg-slate-700 hover:bg-slate-600 rounded cursor-pointer"
+                                >
+                                    <div className="text-white font-medium">{p.name}</div>
+                                    <div className="text-xs text-slate-400">
+                                        {p.language.toUpperCase()} • {new Date(p.updatedAt).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            ))}
+                            {projects.length === 0 && (
+                                <div className="text-slate-500 text-center py-4">Нет проектов</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Version History Modal */}
+            {showVersions && (
+                <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center" onClick={() => setShowVersions(false)}>
+                    <div className="bg-slate-800 rounded-lg p-4 w-96 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-white">🕐 История версий</h3>
+                            <button onClick={() => setShowVersions(false)} className="text-slate-400 hover:text-white">✕</button>
+                        </div>
+                        <div className="space-y-2">
+                            {versions.map(v => (
+                                <div 
+                                    key={v.id}
+                                    className="p-3 bg-slate-700 rounded flex justify-between items-center"
+                                >
+                                    <div className="text-sm text-white">
+                                        {new Date(v.timestamp).toLocaleString()}
+                                    </div>
+                                    <button 
+                                        onClick={() => restoreVersion(v.id)}
+                                        className="px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs text-white"
+                                    >
+                                        Восстановить
+                                    </button>
+                                </div>
+                            ))}
+                            {versions.length === 0 && (
+                                <div className="text-slate-500 text-center py-4">Нет сохранённых версий</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* LEFT: Categories */}
             <div className="w-40 bg-slate-900 border-r border-slate-700 flex flex-col overflow-y-auto">
+                {/* Project Controls */}
+                <div className="p-2 border-b border-slate-700">
+                    <button 
+                        onClick={loadProjectList}
+                        className="w-full py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white mb-2"
+                    >
+                        📁 Проекты
+                    </button>
+                    {currentProject && (
+                        <div className="space-y-1">
+                            <div className="text-[10px] text-slate-400 truncate" title={currentProject.name}>
+                                {currentProject.name}
+                            </div>
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className="flex-1 py-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 rounded text-[10px] text-white"
+                                >
+                                    {isSaving ? '...' : '💾'}
+                                </button>
+                                <button 
+                                    onClick={loadVersions}
+                                    className="flex-1 py-1 bg-slate-600 hover:bg-slate-500 rounded text-[10px] text-white"
+                                >
+                                    🕐
+                                </button>
+                            </div>
+                            {lastSaved && (
+                                <div className="text-[8px] text-green-400">
+                                    Сохранено: {lastSaved.toLocaleTimeString()}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+                
                 <div className="p-2 text-xs font-bold text-slate-500 uppercase">Library</div>
                 {Object.entries(CATEGORIES).map(([cat, types]) => (
                     <div key={cat} className="mb-4 px-2">

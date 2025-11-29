@@ -6,6 +6,7 @@ import { CyberBay } from './CyberBay';
 import { UserAppRunner } from './UserAppRunner';
 import { UserApp, GameState, InventoryItem, NewsArticle } from '../types';
 import { devFsService } from '../services/devFsService';
+import { siteService, SiteMeta, SiteContent } from '../services/siteService';
 
 interface BrowserProps {
   onClose: () => void;
@@ -31,6 +32,18 @@ export const Browser: React.FC<BrowserProps> = ({ onClose, money, inventory, isS
   const [siteName, setSiteName] = useState('');
   const [filter, setFilter] = useState('all');
   const [accessTimeLeft, setAccessTimeLeft] = useState('');
+  const [devFsSites, setDevFsSites] = useState<SiteMeta[]>([]);
+  const [showSiteList, setShowSiteList] = useState(false);
+
+  // Load DevFS sites on mount
+  useEffect(() => {
+      loadDevFsSites();
+  }, []);
+
+  const loadDevFsSites = async () => {
+      const sites = await siteService.listSites();
+      setDevFsSites(sites);
+  };
 
   // Access Timer Logic
   useEffect(() => {
@@ -111,24 +124,23 @@ export const Browser: React.FC<BrowserProps> = ({ onClose, money, inventory, isS
   // Load site from DevFS
   const loadSite = async (siteNameParam: string) => {
       try {
-          const siteIndexPath = `/sites/${siteNameParam}/index.html`;
-          const entry = await devFsService.getEntry(siteIndexPath);
-          if (entry && 'content' in entry) {
+          const content = await siteService.loadSite(siteNameParam);
+          if (content) {
               setSiteName(siteNameParam);
-              setSiteHtml(entry.content as string);
+              setSiteHtml(siteService.renderSiteWithStyles(content));
               setPage('site');
-              setUrl(`/sites/${siteNameParam}`);
-              setCurrentUrl(`/sites/${siteNameParam}`);
+              setUrl(`${siteNameParam}.local`);
+              setCurrentUrl(`${siteNameParam}.local`);
           } else {
               setPage('404');
-              setUrl(`/sites/${siteNameParam}`);
-              setCurrentUrl(`/sites/${siteNameParam}`);
+              setUrl(`${siteNameParam}.local`);
+              setCurrentUrl(`${siteNameParam}.local`);
           }
       } catch (e) {
           console.error('Failed to load site:', e);
           setPage('404');
-          setUrl(`/sites/${siteNameParam}`);
-          setCurrentUrl(`/sites/${siteNameParam}`);
+          setUrl(`${siteNameParam}.local`);
+          setCurrentUrl(`${siteNameParam}.local`);
       }
   };
 
@@ -309,6 +321,32 @@ export const Browser: React.FC<BrowserProps> = ({ onClose, money, inventory, isS
             <button onClick={() => navigate('cyberbay.market')} className={`hover:text-blue-500 ${page === 'resale' ? 'text-blue-600 underline' : ''}`}>CyberBay</button>
             <button onClick={() => navigate('tech-news.net')} className={`hover:text-blue-500 ${page === 'news' ? 'text-blue-600 underline' : ''}`}>Tech News</button>
             
+            {/* DevFS Sites dropdown */}
+            <div className="relative">
+                <button 
+                    onClick={() => { loadDevFsSites(); setShowSiteList(!showSiteList); }}
+                    className={`hover:text-green-600 flex items-center gap-1 ${page === 'site' ? 'text-green-600 underline' : ''}`}
+                >
+                    📁 Sites {devFsSites.length > 0 && `(${devFsSites.length})`}
+                </button>
+                {showSiteList && (
+                    <div className="absolute top-6 left-0 bg-white border border-slate-200 rounded shadow-lg z-50 min-w-[150px]">
+                        {devFsSites.map(site => (
+                            <button 
+                                key={site.name}
+                                onClick={() => { loadSite(site.name); setShowSiteList(false); }}
+                                className="w-full text-left px-3 py-2 hover:bg-slate-100 text-sm"
+                            >
+                                🌐 {site.name}.local
+                            </button>
+                        ))}
+                        {devFsSites.length === 0 && (
+                            <div className="px-3 py-2 text-slate-400 text-sm">Нет сайтов</div>
+                        )}
+                    </div>
+                )}
+            </div>
+
             {userApps.map(app => app.domain && (
                 <button key={app.id} onClick={() => navigate(`ang://${app.domain}`)} className="text-purple-600 hover:text-purple-800 flex items-center gap-1">
                     <span>{app.icon}</span> {app.domain}
