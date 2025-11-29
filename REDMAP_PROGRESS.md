@@ -313,19 +313,40 @@
 
 ---
 
-## 🎯 LAYER 8-9 — Player Roles & Tiers 🟡 (30% DONE)
+## 🎯 LAYER 8-9 — Player Roles & Tiers ✅ (100% DONE)
 
-### ✅ Реализовано:
+### ✅ Полностью реализовано:
 
-- SkillTreeApp с навыками
-- Система прогресса
+1. **Player Role Service** ✅
+   - `services/playerRoleService.ts` - полный сервис
+   - 5 ролей: Programmer, Engineer, Hacker, Security, Trader
+   - Уникальные бонусы для каждой роли:
+     - 💻 Programmer: +25% coding_speed
+     - 🔧 Engineer: -15% hardware_discount
+     - 👾 Hacker: +30% hack_power
+     - 🛡️ Security: +40% defense
+     - 💰 Trader: +20% trade_bonus
 
-### ❌ Не реализовано:
+2. **Player Tiers (Career Levels)** ✅
+   - 5 уровней: Trainee → Junior → Middle → Senior → Architect
+   - Автоматическое повышение по репутации
+   - Прогресс-бар в SettingsApp
+   - Требования репутации: 0 → 100 → 500 → 2000 → 10000
 
-- Выбор роли (Programmer, Engineer, Hacker, Security, Trader)
-- Карьерные уровни (Trainee → Architect)
-- Влияние ролей на доступ
-- Специфичные деревья навыков
+3. **Role Selection** ✅
+   - Выбор роли при регистрации в AuthScreen
+   - Отображение роли в SettingsApp (профиль)
+
+4. **Role Bonuses Integration** ✅
+   - coding_speed применяется к автокоду и клик-кодингу
+   - hardware_discount применяется при покупке железа
+   - trade_bonus применяется при продаже на CyberBay
+
+5. **Tier Progress System** ✅
+   - getTierProgress() - прогресс до следующего уровня
+   - getNextTier() - информация о следующем уровне
+   - calculateTier() - автоматический расчёт tier по репутации
+   - Tier автоматически обновляется при изменении репутации
 
 ---
 
@@ -375,12 +396,12 @@
 | 5 | Corporations | 80% | ✅ Done |
 | 6 | Labs | 0% | ❌ Not Started |
 | 7 | Blueprints | 70% | ✅ Done |
-| 8-9 | Roles & Tiers | 30% | 🟡 Partial |
+| 8-9 | Roles & Tiers | 100% | ✅ **COMPLETE** |
 | 10-12 | Social & Contracts | 50% | 🟡 Partial (LAYER 28) |
 | 13 | Planet Sphere | 0% | ❌ Not Started |
 | 14 | Hacking Layer | 5% | ❌ Minimal |
 | 28 | ANG Vers S-Tier | 100% | ✅ Done |
-| **TOTAL** | | **65%** | 🟢 **65% COMPLETE** |
+| **TOTAL** | | **70%** | 🟢 **70% COMPLETE** |
 
 ---
 

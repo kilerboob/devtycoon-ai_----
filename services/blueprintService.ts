@@ -325,6 +325,123 @@ class BlueprintService {
 
     return { canCraft: true };
   }
+
+  /**
+   * Craft an item from blueprint
+   * Returns the crafted item info or null if failed
+   */
+  craftItem(blueprint: Blueprint, playerLevel: SkillLevel): {
+    success: boolean;
+    item?: {
+      id: string;
+      name: string;
+      type: BlueprintType;
+      tier: BlueprintTier;
+      stats: Blueprint['stats'];
+      quality: 'poor' | 'normal' | 'good' | 'excellent' | 'perfect';
+      durability: number;
+    };
+    message: string;
+  } {
+    const successChance = this.calculateCraftingChance(blueprint, playerLevel);
+    const roll = Math.random() * 100;
+    
+    if (roll > successChance) {
+      return {
+        success: false,
+        message: `Крафт провален! (Шанс был ${successChance.toFixed(0)}%)`
+      };
+    }
+
+    // Determine quality based on how well the roll was
+    const qualityRoll = Math.random() * 100;
+    let quality: 'poor' | 'normal' | 'good' | 'excellent' | 'perfect' = 'normal';
+    let statMultiplier = 1.0;
+    
+    if (qualityRoll > 95) {
+      quality = 'perfect';
+      statMultiplier = 1.3;
+    } else if (qualityRoll > 80) {
+      quality = 'excellent';
+      statMultiplier = 1.15;
+    } else if (qualityRoll > 50) {
+      quality = 'good';
+      statMultiplier = 1.05;
+    } else if (qualityRoll < 15) {
+      quality = 'poor';
+      statMultiplier = 0.8;
+    }
+
+    const qualityNames: Record<string, string> = {
+      'poor': 'Низкое',
+      'normal': 'Обычное',
+      'good': 'Хорошее',
+      'excellent': 'Отличное',
+      'perfect': 'Идеальное'
+    };
+
+    return {
+      success: true,
+      item: {
+        id: uuidv4(),
+        name: `${blueprint.name} [${qualityNames[quality]}]`,
+        type: blueprint.type,
+        tier: blueprint.tier,
+        stats: {
+          power: Math.floor(blueprint.stats.power * statMultiplier),
+          efficiency: Math.floor(blueprint.stats.efficiency * statMultiplier),
+          durability: Math.floor(blueprint.stats.durability * statMultiplier),
+          complexity: blueprint.stats.complexity
+        },
+        quality,
+        durability: 100
+      },
+      message: `Успешно скрафчено: ${blueprint.name} [${qualityNames[quality]}]!`
+    };
+  }
+
+  /**
+   * Convert crafted item to hardware catalog format
+   */
+  craftedItemToHardware(craftedItem: NonNullable<ReturnType<typeof this.craftItem>['item']>, blueprint: Blueprint): {
+    id: string;
+    type: string;
+    name: string;
+    cost: number;
+    description: string;
+    visualClass: string;
+    effect: { type: string; value: number };
+  } {
+    const typeInfo = BLUEPRINT_TYPES[craftedItem.type];
+    
+    // Map blueprint type to hardware effect type
+    const effectMap: Record<BlueprintType, { type: string; getValue: (stats: Blueprint['stats']) => number }> = {
+      'cpu': { type: 'click_power', getValue: (s) => Math.floor(s.power / 10) },
+      'gpu': { type: 'auto_code', getValue: (s) => Math.floor(s.power / 20) },
+      'ram': { type: 'click_power', getValue: (s) => Math.floor(s.efficiency / 20) },
+      'ssd': { type: 'auto_code', getValue: (s) => Math.floor(s.efficiency / 25) },
+      'cooler': { type: 'cooling', getValue: (s) => Math.floor(s.power * 2) },
+      'case': { type: 'heat', getValue: (s) => -Math.floor(s.efficiency / 5) },
+      'ai-core': { type: 'auto_code', getValue: (s) => Math.floor(s.power / 5) },
+      'quantum-node': { type: 'click_power', getValue: (s) => Math.floor(s.power / 3) },
+      'neural-chip': { type: 'luck', getValue: (s) => Math.floor(s.efficiency / 30) },
+    };
+
+    const effectInfo = effectMap[craftedItem.type] || { type: 'click_power', getValue: () => 1 };
+
+    return {
+      id: `crafted_${craftedItem.id}`,
+      type: craftedItem.type,
+      name: craftedItem.name,
+      cost: blueprint.marketValue,
+      description: `${typeInfo.name} Tier ${craftedItem.tier}. Качество: ${craftedItem.quality}. Power: ${craftedItem.stats.power}`,
+      visualClass: `crafted-${craftedItem.tier.toLowerCase()}`,
+      effect: {
+        type: effectInfo.type,
+        value: effectInfo.getValue(craftedItem.stats)
+      }
+    };
+  }
 }
 
 export const blueprintService = new BlueprintService();

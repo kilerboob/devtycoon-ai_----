@@ -15,6 +15,7 @@ import { devFsService, FSWatcherCallback } from './services/devFsService';
 import migrateEnsureIds from './services/devFsMigration';
 import { onlineService } from './services/onlineMock';
 import { shardService } from './services/shardService';
+import { playerRoleService } from './services/playerRoleService';
 import { MatrixBackground } from './components/MatrixBackground';
 import { EndingScreen } from './components/EndingScreen';
 import { NotificationContainer } from './components/NotificationContainer';
@@ -115,6 +116,11 @@ export default function App() {
     // LAYER 4: Get shard multipliers for economy/XP
     const getShardMultipliers = useCallback(() => {
         return shardService.getMultipliers();
+    }, []);
+    
+    // LAYER 9: Calculate and update player tier based on reputation
+    const calculateUpdatedTier = useCallback((reputation: number) => {
+        return playerRoleService.calculateTier(reputation);
     }, []);
     
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
@@ -502,7 +508,9 @@ export default function App() {
                 let energyDrain = 0;
 
                 if (autoCodePerSecond > 0 && currentEnergy > 5) {
-                    const codeGenerated = autoCodePerSecond * (crunchRef.current ? 1.5 : 1) * efficiency;
+                    // LAYER 8: Apply role coding_speed bonus
+                    const baseCoded = autoCodePerSecond * (crunchRef.current ? 1.5 : 1) * efficiency;
+                    const codeGenerated = playerRoleService.applyRoleBonus(baseCoded, prev.playerRole, 'coding_speed');
                     newLOC += codeGenerated;
                     newBugs += (Math.random() < bugChance * 0.1 ? 1 : 0);
 
@@ -856,7 +864,9 @@ export default function App() {
         playSound('key');
 
         setGameState(prev => {
-            const generated = clickPower * multiplier;
+            // LAYER 8: Apply role coding_speed bonus
+            const baseGenerated = clickPower * multiplier;
+            const generated = playerRoleService.applyRoleBonus(baseGenerated, prev.playerRole, 'coding_speed');
 
             // Energy Cost Logic
             const energyCost = unlockedPerks?.includes('perk_coffee') ? 0.3 : 0.5;
@@ -903,14 +913,18 @@ export default function App() {
         setIsHacking(false);
         playSound('success');
         const duration = 2 * 60 * 60 * 1000; // 2 hours access
-        setGameState(prev => ({
-            ...prev,
-            isShadowMarketUnlocked: true,
-            shadowAccessExpiry: Date.now() + duration,
-            reputation: prev.reputation + 100,
-            currentQuestIndex: prev.currentQuestIndex + 1,
-            signalEndTime: 0 // Clear signal
-        }));
+        setGameState(prev => {
+            const newRep = prev.reputation + 100;
+            return {
+                ...prev,
+                isShadowMarketUnlocked: true,
+                shadowAccessExpiry: Date.now() + duration,
+                reputation: newRep,
+                playerTier: calculateUpdatedTier(newRep),
+                currentQuestIndex: prev.currentQuestIndex + 1,
+                signalEndTime: 0 // Clear signal
+            };
+        });
         setModalData({
             title: "СВЯЗЬ УСТАНОВЛЕНА",
             content: `Шлюз взломан. Канал доступа к DarkHub открыт на 2 часа. Поторопись.`,
@@ -960,12 +974,17 @@ export default function App() {
             const moneyReward = Math.floor(currentQuest.rewardMoney * shardMult.economy);
             const xpReward = Math.floor(currentQuest.rewardExp * shardMult.xp);
             
-            setGameState(prev => ({
-                ...prev,
-                money: prev.money + moneyReward,
-                reputation: prev.reputation + xpReward,
-                currentQuestIndex: prev.currentQuestIndex + 1
-            }));
+            setGameState(prev => {
+                const newRep = prev.reputation + xpReward;
+                const newTier = calculateUpdatedTier(newRep);
+                return {
+                    ...prev,
+                    money: prev.money + moneyReward,
+                    reputation: newRep,
+                    playerTier: newTier,
+                    currentQuestIndex: prev.currentQuestIndex + 1
+                };
+            });
             setModalData({
                 title: "ЗАДАЧА ВЫПОЛНЕНА",
                 content: `Получено: $${moneyReward}${shardMult.economy !== 1 ? ` (x${shardMult.economy})` : ''} | XP: +${xpReward}${shardMult.xp !== 1 ? ` (x${shardMult.xp})` : ''}`,
@@ -1012,13 +1031,17 @@ export default function App() {
             // Check if this is the AGI project (Victory Condition)
             const isAGIProject = released.id === 'proj_agi';
 
-            setGameState(prev => ({
-                ...prev,
-                activeProject: null,
-                releasedProjects: [...(prev.releasedProjects || []), released],
-                reputation: prev.reputation + (released.difficulty * 10),
-                isGameWon: isAGIProject // Trigger victory screen
-            }));
+            setGameState(prev => {
+                const newRep = prev.reputation + (released.difficulty * 10);
+                return {
+                    ...prev,
+                    activeProject: null,
+                    releasedProjects: [...(prev.releasedProjects || []), released],
+                    reputation: newRep,
+                    playerTier: calculateUpdatedTier(newRep),
+                    isGameWon: isAGIProject // Trigger victory screen
+                };
+            });
 
             addLog(`Проект "${released.name}" выпущен на рынок!`, 'success');
             addNotification('🚀 Релиз успешен!', `"${released.name}" теперь приносит $${released.baseRevenue}/день`, 'success');
@@ -1113,6 +1136,7 @@ export default function App() {
             return {
                 ...prev,
                 reputation: newRep,
+                playerTier: calculateUpdatedTier(newRep),
                 unlockedPerks: newPerks,
                 clickPower: stats.clickPower,
                 autoCodePerSecond: stats.autoCode,
@@ -1132,6 +1156,15 @@ export default function App() {
             let cost = item.cost;
             if (!isShadow && prev.marketTrends && prev.marketTrends[item.type]) {
                 cost = Math.floor(cost * prev.marketTrends[item.type]);
+            }
+            
+            // LAYER 8: Apply engineer role hardware_discount (negative bonus = discount)
+            // Engineer gets -15% cost, so we invert: cost * (1 - bonus/100)
+            if (!isShadow && prev.playerRole === 'engineer') {
+                const discount = playerRoleService.getRole('engineer')?.bonuses.find(b => b.type === 'hardware_discount');
+                if (discount) {
+                    cost = Math.floor(cost * (1 - discount.value / 100));
+                }
             }
 
             if (isShadow) {
@@ -1209,7 +1242,10 @@ export default function App() {
 
             // LAYER 4: Apply shard economy multiplier to sales
             const shardMult = getShardMultipliers();
-            const finalValue = Math.floor(value * shardMult.economy);
+            let finalValue = Math.floor(value * shardMult.economy);
+            
+            // LAYER 8: Apply trader role trade_bonus
+            finalValue = Math.floor(playerRoleService.applyRoleBonus(finalValue, prev.playerRole, 'trade_bonus'));
 
             return {
                 ...prev,

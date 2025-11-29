@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
-import { Blueprint, BlueprintTier, BlueprintType } from '../types';
+import { Blueprint, BlueprintTier, BlueprintType, SkillLevel } from '../types';
 import { 
   TIER_CONFIG, 
   BLUEPRINT_TYPES,
   blueprintService
 } from '../services/blueprintService';
+import { playSound } from '../utils/sound';
 
 interface BlueprintsAppProps {
   blueprints: Blueprint[];
   money: number;
-  onCraft?: (blueprint: Blueprint) => void;
+  shadowCredits?: number;
+  playerLevel?: SkillLevel;
+  onCraft?: (blueprint: Blueprint, craftedItem: ReturnType<typeof blueprintService.craftItem>['item']) => void;
   onSell?: (blueprint: Blueprint) => void;
   onAddBlueprint?: (blueprint: Blueprint) => void;
+  onSpendMoney?: (amount: number) => void;
+  onSpendShadowCredits?: (amount: number) => void;
 }
 
 const TIER_COLORS: Record<BlueprintTier, string> = {
@@ -26,13 +31,19 @@ const TIER_COLORS: Record<BlueprintTier, string> = {
 export const BlueprintsApp: React.FC<BlueprintsAppProps> = ({
   blueprints,
   money,
+  shadowCredits = 0,
+  playerLevel = SkillLevel.INTERN,
   onCraft,
   onSell,
-  onAddBlueprint
+  onAddBlueprint,
+  onSpendMoney,
+  onSpendShadowCredits
 }) => {
   const [selectedTier, setSelectedTier] = useState<BlueprintTier | 'all'>('all');
   const [selectedType, setSelectedType] = useState<BlueprintType | 'all'>('all');
   const [selectedBlueprint, setSelectedBlueprint] = useState<Blueprint | null>(null);
+  const [craftResult, setCraftResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isCrafting, setIsCrafting] = useState(false);
 
   const filteredBlueprints = blueprints.filter(bp => {
     if (selectedTier !== 'all' && bp.tier !== selectedTier) return false;
@@ -229,21 +240,98 @@ export const BlueprintsApp: React.FC<BlueprintsAppProps> = ({
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2">
-                {onCraft && (
-                  <button
-                    onClick={() => onCraft(selectedBlueprint)}
-                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded font-bold"
-                  >
-                    🔨 Создать
-                  </button>
-                )}
+              <div className="space-y-2">
+                {/* Craft Button */}
+                {onCraft && (() => {
+                  const canCraftResult = blueprintService.canCraft(
+                    selectedBlueprint, 
+                    money, 
+                    shadowCredits, 
+                    playerLevel
+                  );
+                  const craftChance = blueprintService.calculateCraftingChance(selectedBlueprint, playerLevel);
+                  
+                  const handleCraft = async () => {
+                    if (!canCraftResult.canCraft || isCrafting) return;
+                    
+                    setIsCrafting(true);
+                    setCraftResult(null);
+                    
+                    // Spend resources
+                    if (onSpendMoney) onSpendMoney(selectedBlueprint.craftingCost.money);
+                    if (onSpendShadowCredits && selectedBlueprint.craftingCost.shadowCredits) {
+                      onSpendShadowCredits(selectedBlueprint.craftingCost.shadowCredits);
+                    }
+                    
+                    // Simulate crafting time
+                    await new Promise(r => setTimeout(r, 1500));
+                    
+                    // Attempt craft
+                    const result = blueprintService.craftItem(selectedBlueprint, playerLevel);
+                    setCraftResult({ success: result.success, message: result.message });
+                    
+                    if (result.success && result.item) {
+                      playSound('success');
+                      onCraft(selectedBlueprint, result.item);
+                    } else {
+                      playSound('error');
+                    }
+                    
+                    setIsCrafting(false);
+                  };
+                  
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-400">Шанс успеха:</span>
+                        <span className={`font-bold ${
+                          craftChance >= 80 ? 'text-green-400' :
+                          craftChance >= 50 ? 'text-yellow-400' :
+                          'text-red-400'
+                        }`}>
+                          {craftChance.toFixed(0)}%
+                        </span>
+                      </div>
+                      
+                      <button
+                        onClick={handleCraft}
+                        disabled={!canCraftResult.canCraft || isCrafting}
+                        className={`w-full py-2 rounded font-bold transition-all ${
+                          isCrafting 
+                            ? 'bg-blue-800 animate-pulse cursor-wait'
+                            : canCraftResult.canCraft
+                              ? 'bg-blue-600 hover:bg-blue-500'
+                              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {isCrafting ? '⚙️ Крафт...' : '🔨 Создать компонент'}
+                      </button>
+                      
+                      {!canCraftResult.canCraft && (
+                        <div className="text-xs text-red-400 text-center">
+                          ⚠️ {canCraftResult.reason}
+                        </div>
+                      )}
+                      
+                      {craftResult && (
+                        <div className={`text-sm text-center p-2 rounded ${
+                          craftResult.success 
+                            ? 'bg-green-900/50 text-green-400 border border-green-500/50'
+                            : 'bg-red-900/50 text-red-400 border border-red-500/50'
+                        }`}>
+                          {craftResult.success ? '✅' : '❌'} {craftResult.message}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                
                 {onSell && (
                   <button
                     onClick={() => onSell(selectedBlueprint)}
-                    className="flex-1 py-2 bg-yellow-600 hover:bg-yellow-500 rounded font-bold"
+                    className="w-full py-2 bg-yellow-600 hover:bg-yellow-500 rounded font-bold"
                   >
-                    💰 Продать
+                    💰 Продать чертёж (${getBlueprintValue(selectedBlueprint).toLocaleString()})
                   </button>
                 )}
               </div>

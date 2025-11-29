@@ -6,6 +6,7 @@ import { dbService } from '../services/dbService';
 import { TIER_CONFIG, BLUEPRINT_TYPES, blueprintService } from '../services/blueprintService';
 import { CORPORATIONS, corporationService } from '../services/corporationService';
 import { shardService } from '../services/shardService';
+import { playerRoleService } from '../services/playerRoleService';
 
 interface SettingsAppProps {
     onClose: () => void;
@@ -231,6 +232,38 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
                             <div className="text-[9px] text-slate-500">Репутация</div>
                         </div>
                     </div>
+
+                    {/* LAYER 9: Tier Progress */}
+                    {(() => {
+                        const tierProgress = playerRoleService.getTierProgress(state.reputation, tier);
+                        const nextTier = playerRoleService.getNextTier(tier);
+                        return (
+                            <div className="bg-white rounded p-2 border">
+                                <div className="flex justify-between items-center text-xs mb-1">
+                                    <span className="font-bold text-slate-700">📈 Прогресс до повышения</span>
+                                    {nextTier ? (
+                                        <span className="text-slate-500">
+                                            {nextTier.icon} {nextTier.name}
+                                        </span>
+                                    ) : (
+                                        <span className="text-yellow-600 font-bold">MAX 👑</span>
+                                    )}
+                                </div>
+                                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full transition-all duration-300"
+                                        style={{ 
+                                            width: `${tierProgress.percentage}%`,
+                                            backgroundColor: TIER_INFO[tier].color
+                                        }}
+                                    />
+                                </div>
+                                <div className="text-[10px] text-slate-500 mt-0.5 text-center">
+                                    {tierProgress.current} / {tierProgress.required} XP ({tierProgress.percentage}%)
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Corps Summary */}
                     <div className="bg-white rounded p-2 border">
