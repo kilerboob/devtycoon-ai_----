@@ -399,7 +399,7 @@ export interface GameState {
   collectedPrototypes?: CollectedPrototype[];
 }
 
-export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | string;
+export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | 'planet' | string;
 
 // LAYER 1: DevFS Types
 export interface DevFile {

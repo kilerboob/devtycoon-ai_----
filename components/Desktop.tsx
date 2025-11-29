@@ -22,6 +22,7 @@ import { TutorialGuide } from './TutorialGuide';
 import { CodeEditor } from './CodeEditor';
 import { SocialHub } from './SocialHub';
 import { LabsApp } from './LabsApp';
+import { PlanetApp } from './PlanetApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -291,6 +292,8 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'social', type: 'app', title: 'SocialHub', icon: '👥', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'social' },
     // Labs Network (LAYER 6: Independent Labs, hacking, prototypes)
     { id: 'labs', type: 'app', title: 'Labs', icon: '🔬', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 3, appId: 'labs' },
+    // Planet Sphere (LAYER 13: CyberNation visualization)
+    { id: 'planet', type: 'app', title: 'Planet', icon: '🌍', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 4, appId: 'planet' },
     // Tutorial Guide App - Help system with all features walkthrough
     { id: 'tutorial', type: 'app', title: 'Гайд', icon: '📖', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'tutorial' },
     // System folder shortcuts - open StorageApp with initial path
@@ -1226,6 +1229,15 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                 />
             </div>
         )}
+        {/* LAYER 13: Planet Sphere - CyberNation Visualization */}
+        {activeApp === 'planet' && !minimized.includes('planet') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-cyan-900">
+                <PlanetApp
+                    state={props.state}
+                    onClose={() => toggleApp('planet')}
+                />
+            </div>
+        )}
         {activeApp === 'settings' && !minimized.includes('settings') && (
             <SettingsApp 
                 onClose={() => toggleApp('settings')} 
@@ -1279,6 +1291,12 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                   className="w-full text-left px-2 py-2 hover:bg-slate-700 rounded text-sm text-white flex items-center gap-2 cursor-pointer"
               >
                   🔬 Labs Network
+              </div>
+              <div 
+                  onClick={() => { toggleApp('planet'); setStartMenuOpen(false); }} 
+                  className="w-full text-left px-2 py-2 hover:bg-slate-700 rounded text-sm text-white flex items-center gap-2 cursor-pointer"
+              >
+                  🌍 CyberNation Planet
               </div>
               <div className="h-px bg-slate-700 my-2"></div>
               <div 
