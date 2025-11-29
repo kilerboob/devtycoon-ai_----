@@ -232,7 +232,8 @@ interface DesktopProps {
     onRenameFile?: (oldId: string, newId: string) => void;
   storageStats: { totalCapacity: number, usedBytes: number, usedGB: number };
   onSetLanguage: (lang: Language) => void;
-  onStartHack?: () => void;
+  // LAYER 6: Updated to pass lab context
+  onStartHack?: (labId?: string, questId?: string) => void;
   onPayBill: (id: string) => void;
   onTakeLoan: (amount: number) => void;
   onRepayLoan: (amount: number) => void;
@@ -1219,8 +1220,7 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                     state={props.state}
                     onStartHack={(labId, questId) => {
                         // Trigger hacking minigame with lab context
-                        if (props.onStartHack) props.onStartHack();
-                        console.log('[Labs] Starting hack on lab:', labId, 'quest:', questId);
+                        if (props.onStartHack) props.onStartHack(labId, questId);
                     }}
                     onClose={() => toggleApp('labs')}
                 />

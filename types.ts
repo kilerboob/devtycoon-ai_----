@@ -260,6 +260,21 @@ export interface Notification {
   duration?: number; // Auto-dismiss time in ms (default 5000)
 }
 
+// --- LAYER 6: LABS SYSTEM ---
+export interface LabsPlayerState {
+  [labId: string]: {
+    reputation: number;
+    completedQuests: string[];
+  };
+}
+
+export interface CollectedPrototype {
+  id: string;
+  name: string;
+  acquiredAt: number;
+  sourceLabId: string;
+}
+
 // --- ACHIEVEMENT SYSTEM ---
 export interface Achievement {
   id: string;
@@ -378,6 +393,10 @@ export interface GameState {
 
   // LAYER 28: ANG Vers Social State
   angVersState?: ANGVersState;
+
+  // LAYER 6: Labs State
+  labsState?: LabsPlayerState;
+  collectedPrototypes?: CollectedPrototype[];
 }
 
 export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | string;

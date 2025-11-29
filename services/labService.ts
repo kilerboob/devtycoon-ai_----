@@ -333,6 +333,11 @@ class LabService {
         return this.labs.find(lab => lab.id === id);
     }
 
+    // Get all quests
+    getQuests(): LabQuest[] {
+        return this.quests;
+    }
+
     // Get quests for a lab
     getLabQuests(labId: string): LabQuest[] {
         return this.quests.filter(q => q.labId === labId);

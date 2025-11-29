@@ -16,6 +16,7 @@ import migrateEnsureIds from './services/devFsMigration';
 import { onlineService } from './services/onlineMock';
 import { shardService } from './services/shardService';
 import { playerRoleService } from './services/playerRoleService';
+import { labService } from './services/labService';
 import { MatrixBackground } from './components/MatrixBackground';
 import { EndingScreen } from './components/EndingScreen';
 import { NotificationContainer } from './components/NotificationContainer';
@@ -88,6 +89,8 @@ export default function App() {
     const [isPCBuildMode, setIsPCBuildMode] = useState(false);
     const [isJournalOpen, setIsJournalOpen] = useState(false);
     const [isHacking, setIsHacking] = useState(false);
+    // LAYER 6: Labs hacking context
+    const [hackingContext, setHackingContext] = useState<{ labId?: string; questId?: string } | null>(null);
     const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
     const [logs, setLogs] = useState<LogEntry[]>([]);
 
@@ -1136,6 +1139,84 @@ export default function App() {
     const handleHackSuccess = () => {
         setIsHacking(false);
         playSound('success');
+        
+        // LAYER 6: Check if this is a Lab hack
+        if (hackingContext?.labId) {
+            const quest = hackingContext.questId 
+                ? labService.getQuests().find(q => q.id === hackingContext.questId)
+                : null;
+            const lab = labService.getLab(hackingContext.labId);
+            
+            if (quest) {
+                // Complete the quest and get rewards
+                const rewards = quest.rewards;
+                const shardMult = getShardMultipliers();
+                
+                setGameState(prev => {
+                    const newRep = prev.reputation + Math.floor(rewards.reputation * shardMult.xp);
+                    const newMoney = prev.money + Math.floor(rewards.money * shardMult.economy);
+                    const newShadowCredits = prev.shadowCredits + rewards.shadowCredits;
+                    
+                    // Update lab reputation
+                    const labsState = { ...(prev.labsState || {}) };
+                    labsState[hackingContext.labId!] = {
+                        reputation: (labsState[hackingContext.labId!]?.reputation || 0) + rewards.reputation,
+                        completedQuests: [...(labsState[hackingContext.labId!]?.completedQuests || []), quest.id]
+                    };
+                    
+                    // Add prototypes if any
+                    const newPrototypes = [...(prev.collectedPrototypes || [])];
+                    if (rewards.prototypes) {
+                        newPrototypes.push(...rewards.prototypes.map(p => ({
+                            id: `proto_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                            name: p,
+                            acquiredAt: Date.now(),
+                            sourceLabId: hackingContext.labId!
+                        })));
+                    }
+                    
+                    return {
+                        ...prev,
+                        money: newMoney,
+                        shadowCredits: newShadowCredits,
+                        reputation: newRep,
+                        playerTier: calculateUpdatedTier(newRep),
+                        labsState,
+                        collectedPrototypes: newPrototypes
+                    };
+                });
+                
+                // Show success modal
+                setModalData({
+                    title: "🔓 ВЗЛОМ УСПЕШЕН",
+                    content: `Лаборатория "${lab?.name || 'Unknown'}" взломана!\n\n💰 +$${quest.rewards.money}\n💀 +${quest.rewards.shadowCredits} SC\n⭐ +${quest.rewards.reputation} репутации\n📊 +${quest.rewards.xp} XP`,
+                    type: 'quest_end'
+                });
+                
+                addLog(`Квест "${quest.title}" выполнен! +$${quest.rewards.money}, +${quest.rewards.shadowCredits} SC`, 'success');
+            } else {
+                // Generic lab hack without quest
+                setGameState(prev => {
+                    const labsState = { ...(prev.labsState || {}) };
+                    labsState[hackingContext.labId!] = {
+                        reputation: (labsState[hackingContext.labId!]?.reputation || 0) + 10,
+                        completedQuests: labsState[hackingContext.labId!]?.completedQuests || []
+                    };
+                    return {
+                        ...prev,
+                        shadowCredits: prev.shadowCredits + 50,
+                        reputation: prev.reputation + 25,
+                        labsState
+                    };
+                });
+                addLog(`Лаборатория взломана! +50 SC, +25 репутации`, 'success');
+            }
+            
+            setHackingContext(null);
+            return;
+        }
+        
+        // Original DarkHub hack logic
         const duration = 2 * 60 * 60 * 1000; // 2 hours access
         setGameState(prev => {
             const newRep = prev.reputation + 100;
@@ -1159,6 +1240,19 @@ export default function App() {
     const handleHackFail = () => {
         setIsHacking(false);
         playSound('error');
+        
+        // LAYER 6: Handle Lab hack failure
+        if (hackingContext?.labId) {
+            setGameState(prev => ({
+                ...prev,
+                tracePercent: Math.min(100, prev.tracePercent + 15),
+                globalHeat: Math.min(100, prev.globalHeat + 5)
+            }));
+            addLog("Взлом лаборатории провален! Уровень угрозы повышен.", "error");
+            setHackingContext(null);
+            return;
+        }
+        
         setGameState(prev => ({
             ...prev,
             tracePercent: Math.min(100, prev.tracePercent + 20),
@@ -1168,9 +1262,15 @@ export default function App() {
         addLog("Взлом не удался. Сигнал потерян. Уровень угрозы повышен!", "error");
     };
 
-    const handleHackStart = () => {
-        // Double check signal is active or just allow it for quest
-        addLog("INITIATING BREACH PROTOCOL...", "warn");
+    // LAYER 6: Updated hack start to accept lab context
+    const handleHackStart = (labId?: string, questId?: string) => {
+        if (labId) {
+            setHackingContext({ labId, questId });
+            addLog(`INITIATING BREACH PROTOCOL: ${labId}...`, "warn");
+        } else {
+            setHackingContext(null);
+            addLog("INITIATING BREACH PROTOCOL...", "warn");
+        }
         setIsHacking(true);
     };
 
