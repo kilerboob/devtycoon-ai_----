@@ -16,7 +16,6 @@ import { InventoryApp } from './InventoryApp';
 import { SettingsApp } from './SettingsApp';
 import { BankApp } from './BankApp';
 import { StorageApp } from './StorageApp';
-import { ProfileApp } from './ProfileApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -265,8 +264,6 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'skills', type: 'app', title: 'Skills', icon: '🧠', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 2, appId: 'skills' },
     { id: 'music', type: 'app', title: 'WinAmp', icon: '🎵', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 3, appId: 'music' },
     { id: 'leaderboard', type: 'app', title: 'Ranking', icon: '🏆', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y, appId: 'leaderboard' },
-    // Profile - единый центр с чертежами, корпорациями, статистикой
-    { id: 'profile', type: 'app', title: 'Профиль', icon: '👤', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'profile' },
     // System folder shortcuts - open StorageApp with initial path
     { id: 'folder-projects', type: 'folder', title: 'Проекты', icon: '📂', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H, appId: 'devfs' },
     { id: 'folder-sites', type: 'folder', title: 'Сайты', icon: '🌐', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'devfs' },
@@ -878,15 +875,16 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
         {activeApp === 'bank' && !minimized.includes('bank') && (
             <BankApp state={props.state} onClose={() => toggleApp('bank')} onPayBill={props.onPayBill} onTakeLoan={props.onTakeLoan} onRepayLoan={props.onRepayLoan} />
         )}
-        {activeApp === 'profile' && !minimized.includes('profile') && (
-            <ProfileApp 
-                state={props.state} 
-                onClose={() => toggleApp('profile')}
+        {activeApp === 'settings' && !minimized.includes('settings') && (
+            <SettingsApp 
+                onClose={() => toggleApp('settings')} 
+                onLogout={props.onExit} 
+                username={props.state.username} 
+                currentLanguage={props.state.language} 
+                onSetLanguage={props.onSetLanguage}
+                state={props.state}
                 onAddBlueprint={props.onAddBlueprint}
             />
-        )}
-        {activeApp === 'settings' && !minimized.includes('settings') && (
-            <SettingsApp onClose={() => toggleApp('settings')} onLogout={props.onExit} username={props.state.username} currentLanguage={props.state.language} onSetLanguage={props.onSetLanguage} />
         )}
         {props.state.userApps.map(app => activeApp === app.id && !minimized.includes(app.id) && (
             <div key={app.id} className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden border border-slate-300">
