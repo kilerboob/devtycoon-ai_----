@@ -263,6 +263,43 @@ class ShardService {
   }
 
   /**
+   * Получить текущий пинг (с вариацией)
+   */
+  getCurrentPing(): number {
+    const shard = this.getCurrentShard();
+    if (!shard) return 50;
+    // Добавляем небольшую вариацию к пингу
+    return shard.ping + Math.floor(Math.random() * 20 - 10);
+  }
+
+  /**
+   * Симуляция сетевой задержки на основе пинга
+   * Используется для имитации лага при действиях
+   */
+  async simulateNetworkDelay(): Promise<void> {
+    const ping = this.getCurrentPing();
+    // Задержка = ping / 10 (чтобы не было слишком долго)
+    const delay = Math.max(10, Math.floor(ping / 10));
+    return new Promise(resolve => setTimeout(resolve, delay));
+  }
+
+  /**
+   * Проверить, является ли текущий шард PvP
+   */
+  isPvPEnabled(): boolean {
+    const shard = this.getCurrentShard();
+    return shard?.isPvP ?? false;
+  }
+
+  /**
+   * Проверить, является ли текущий шард Hardcore
+   */
+  isHardcoreEnabled(): boolean {
+    const shard = this.getCurrentShard();
+    return shard?.isHardcore ?? false;
+  }
+
+  /**
    * Получить статус региона (для UI)
    */
   getRegionEmoji(region: ShardRegion): string {

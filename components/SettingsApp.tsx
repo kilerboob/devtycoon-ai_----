@@ -5,6 +5,7 @@ import { devFsService } from '../services/devFsService';
 import { dbService } from '../services/dbService';
 import { TIER_CONFIG, BLUEPRINT_TYPES, blueprintService } from '../services/blueprintService';
 import { CORPORATIONS, corporationService } from '../services/corporationService';
+import { shardService } from '../services/shardService';
 
 interface SettingsAppProps {
     onClose: () => void;
@@ -393,8 +394,83 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
         </div>
     );
 
-    const renderSystemTab = () => (
+    const renderSystemTab = () => {
+        const currentShard = shardService.getCurrentShard();
+        const shardMult = shardService.getMultipliers();
+        const ping = shardService.getCurrentPing();
+        
+        return (
         <div className="space-y-3">
+            {/* LAYER 4: Server Info */}
+            <div className="bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded p-3">
+                <div className="text-sm font-bold text-slate-700 mb-2">🌐 Сервер</div>
+                {currentShard ? (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">{shardService.getRegionEmoji(currentShard.region)}</span>
+                                <div>
+                                    <div className="font-bold text-slate-800">{currentShard.name}</div>
+                                    <div className="text-[10px] text-slate-500">{currentShard.region}</div>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className={`text-xs font-bold ${shardService.getPingClass(ping)}`}>
+                                    {ping}ms
+                                </div>
+                                <div className="text-[10px] text-slate-500">
+                                    {currentShard.population}/{currentShard.maxPopulation}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Multipliers */}
+                        <div className="flex gap-2">
+                            <div className={`flex-1 text-center py-1 rounded text-xs font-bold ${
+                                shardMult.economy > 1 ? 'bg-green-100 text-green-700' : 
+                                shardMult.economy < 1 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
+                            }`}>
+                                💰 x{shardMult.economy.toFixed(1)}
+                            </div>
+                            <div className={`flex-1 text-center py-1 rounded text-xs font-bold ${
+                                shardMult.xp > 1 ? 'bg-blue-100 text-blue-700' : 
+                                shardMult.xp < 1 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'
+                            }`}>
+                                ⭐ x{shardMult.xp.toFixed(1)}
+                            </div>
+                        </div>
+                        
+                        {/* Features */}
+                        <div className="flex flex-wrap gap-1">
+                            {currentShard.isPvP && (
+                                <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] rounded">⚔️ PvP</span>
+                            )}
+                            {currentShard.isHardcore && (
+                                <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] rounded">💀 Hardcore</span>
+                            )}
+                            {currentShard.features.slice(0, 2).map((f, i) => (
+                                <span key={i} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] rounded">{f}</span>
+                            ))}
+                        </div>
+                        
+                        {/* Change Server Button */}
+                        <button
+                            onClick={async () => {
+                                if (confirm('Сменить сервер? Текущий прогресс сохранится.')) {
+                                    await shardService.clearSelection();
+                                    window.location.reload();
+                                }
+                            }}
+                            className="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded font-bold"
+                        >
+                            🔄 Сменить сервер
+                        </button>
+                    </div>
+                ) : (
+                    <div className="text-slate-400 text-sm">Сервер не выбран</div>
+                )}
+            </div>
+            
             {/* DevFS Stats */}
             <div className="bg-white border border-slate-300 rounded p-3">
                 <div className="text-sm font-bold text-slate-700 mb-2">💾 DevFS Storage</div>
@@ -449,7 +525,7 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
                 </button>
             </div>
         </div>
-    );
+    )};
 
     const renderSecurityTab = () => (
         <div className="space-y-3">

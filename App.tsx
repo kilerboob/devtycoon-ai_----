@@ -111,6 +111,12 @@ export default function App() {
     const confirmPayload = useRef<{ path?: string; count?: number; onConfirm?: () => void } | null>(null);
 
     // --- HELPERS ---
+    
+    // LAYER 4: Get shard multipliers for economy/XP
+    const getShardMultipliers = useCallback(() => {
+        return shardService.getMultipliers();
+    }, []);
+    
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
         setLogs(prev => [...prev.slice(-49), {
             id: Math.random().toString(36).substr(2, 9),
@@ -509,11 +515,15 @@ export default function App() {
                 }
 
                 // 4. Passive Income & Daily Billing (Economy Cycle)
+                // LAYER 4: Apply shard economy multiplier
+                const shardMult = getShardMultipliers();
+                
                 const released = prev.releasedProjects || [];
                 let passiveIncome = released.reduce((acc, p) => acc + (p.baseRevenue || 0), 0) / 60;
+                passiveIncome *= shardMult.economy; // Apply shard multiplier
 
                 if (prev.unlockedPerks?.includes('perk_miner') && !isOverheating) {
-                    passiveIncome += 0.5;
+                    passiveIncome += 0.5 * shardMult.economy;
                 }
 
                 // NEW: User Apps Revenue (Ad Traffic)
@@ -527,6 +537,7 @@ export default function App() {
                         const visitors = Math.floor(baseVisitors * (0.8 + Math.random() * 0.4)); // +/- 20%
                         appRevenue += visitors * BANK_CONSTANTS.TRAFFIC_REVENUE_PER_VISITOR;
                     });
+                    appRevenue *= shardMult.economy; // Apply shard multiplier
                 }
 
                 let newBills = [...prev.bills];
@@ -943,15 +954,21 @@ export default function App() {
         if (currentQuest && currentQuest.solutionRegex.test(cmd.trim())) {
             playSound('success');
             addLog(`Квест "${currentQuest.title}" выполнен!`, 'success');
+            
+            // LAYER 4: Apply shard multipliers
+            const shardMult = getShardMultipliers();
+            const moneyReward = Math.floor(currentQuest.rewardMoney * shardMult.economy);
+            const xpReward = Math.floor(currentQuest.rewardExp * shardMult.xp);
+            
             setGameState(prev => ({
                 ...prev,
-                money: prev.money + currentQuest.rewardMoney,
-                reputation: prev.reputation + currentQuest.rewardExp,
+                money: prev.money + moneyReward,
+                reputation: prev.reputation + xpReward,
                 currentQuestIndex: prev.currentQuestIndex + 1
             }));
             setModalData({
                 title: "ЗАДАЧА ВЫПОЛНЕНА",
-                content: `Получено: $${currentQuest.rewardMoney}`,
+                content: `Получено: $${moneyReward}${shardMult.economy !== 1 ? ` (x${shardMult.economy})` : ''} | XP: +${xpReward}${shardMult.xp !== 1 ? ` (x${shardMult.xp})` : ''}`,
                 explanation: currentQuest.explanation,
                 type: 'quest_end'
             });
@@ -1190,18 +1207,25 @@ export default function App() {
 
             const stats = calculateTotalStats(newEquipped, newInventory, prev.unlockedPerks);
 
+            // LAYER 4: Apply shard economy multiplier to sales
+            const shardMult = getShardMultipliers();
+            const finalValue = Math.floor(value * shardMult.economy);
+
             return {
                 ...prev,
                 inventory: newInventory,
                 equipped: newEquipped,
-                money: prev.money + value,
+                money: prev.money + finalValue,
                 clickPower: stats.clickPower,
                 autoCodePerSecond: stats.autoCode,
                 bugChance: stats.bugChance,
             };
         });
+        
+        const shardMult = getShardMultipliers();
+        const finalValue = Math.floor(value * shardMult.economy);
         playSound('success');
-        addLog(`Товар продан на CyberBay за $${value}`, 'success');
+        addLog(`Товар продан на CyberBay за $${finalValue}${shardMult.economy !== 1 ? ` (x${shardMult.economy})` : ''}`, 'success');
     };
 
     // REFACTORED: Clean item by UID
