@@ -17,6 +17,7 @@ import { SettingsApp } from './SettingsApp';
 import { BankApp } from './BankApp';
 import { StorageApp } from './StorageApp';
 import { CorporationsApp } from './CorporationsApp';
+import { BlueprintsApp } from './BlueprintsApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -264,6 +265,8 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'projects', type: 'app', title: 'Projects', icon: '🚀', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H, appId: 'projects' },
     { id: 'skills', type: 'app', title: 'Skills', icon: '🧠', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 2, appId: 'skills' },
     { id: 'music', type: 'app', title: 'WinAmp', icon: '🎵', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 3, appId: 'music' },
+    // Blueprints App (LAYER 7: Hardware blueprints)
+    { id: 'blueprints', type: 'app', title: 'Чертежи', icon: '📜', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 4, appId: 'blueprints' },
     { id: 'leaderboard', type: 'app', title: 'Ranking', icon: '🏆', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y, appId: 'leaderboard' },
     // Corporations App (LAYER 28: ANG Vers + others)
     { id: 'corporations', type: 'app', title: 'Corps', icon: '🏢', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H, appId: 'corporations' },
@@ -891,6 +894,24 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                     <CorporationsApp 
                         corporationReps={props.state.corporationReps} 
                         onSelectCorporation={(corpId) => console.log('Selected corporation:', corpId)} 
+                    />
+                </div>
+            </div>
+        )}
+        {activeApp === 'blueprints' && !minimized.includes('blueprints') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-purple-900">
+                <div className="h-8 bg-black/80 border-b border-purple-900/50 flex items-center justify-between px-3">
+                    <span className="text-xs font-bold text-purple-400">📜 Чертежи</span>
+                    <div className="flex gap-2">
+                        <button onClick={() => setMinimized(p => [...p, 'blueprints'])} className="w-3 h-3 rounded-full bg-yellow-500"></button>
+                        <button onClick={() => toggleApp('blueprints')} className="w-3 h-3 rounded-full bg-red-500"></button>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <BlueprintsApp 
+                        blueprints={props.state.blueprints || []}
+                        money={props.state.money}
+                        onAddBlueprint={props.onAddBlueprint}
                     />
                 </div>
             </div>
