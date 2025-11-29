@@ -10,7 +10,7 @@ import { dbService } from './dbService';
 // === ТИПЫ ===
 
 export type ShardStatus = 'online' | 'maintenance' | 'full' | 'offline';
-export type ShardRegion = 'EU-West' | 'EU-East' | 'US-East' | 'US-West' | 'Asia-Pacific' | 'RU-Moscow' | 'RU-SPb';
+export type ShardRegion = 'EU-West' | 'EU-East' | 'US-East' | 'US-West' | 'Asia-Pacific' | 'UA-Kyiv' | 'UA-Odesa';
 
 export interface Shard {
   id: string;
@@ -57,7 +57,7 @@ const INITIAL_SHARDS: Shard[] = [
   {
     id: 'shard_cyberia',
     name: 'Cyberia',
-    region: 'RU-Moscow',
+    region: 'UA-Kyiv',
     status: 'online',
     population: 1245,
     maxPopulation: 1500,
@@ -67,8 +67,8 @@ const INITIAL_SHARDS: Shard[] = [
     isPvP: true,
     isHardcore: false,
     createdAt: Date.now() - 180 * 24 * 60 * 60 * 1000,
-    description: 'Главный русскоязычный сервер. Усиленная экономика и PvP.',
-    features: ['PvP арены', 'Усиленная экономика +20%', 'Турниры']
+    description: 'Головний україномовний сервер. Посилена економіка та PvP.',
+    features: ['PvP арени', 'Посилена економіка +20%', 'Турніри']
   },
   {
     id: 'shard_neon_district',
@@ -272,8 +272,8 @@ class ShardService {
       'US-East': '🇺🇸',
       'US-West': '🇺🇸',
       'Asia-Pacific': '🌏',
-      'RU-Moscow': '🇷🇺',
-      'RU-SPb': '🇷🇺'
+      'UA-Kyiv': '��',
+      'UA-Odesa': '🇺🇦'
     };
     return emojis[region] || '🌐';
   }
