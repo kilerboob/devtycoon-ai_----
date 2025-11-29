@@ -557,6 +557,70 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
                     Clear Old Versions
                 </button>
             </div>
+
+            {/* System Disk Monitor - LAYER 3 */}
+            <div className="bg-gradient-to-r from-slate-100 to-slate-50 border border-slate-300 rounded p-3">
+                <div className="text-sm font-bold text-slate-700 mb-2">💿 System Disk</div>
+                <div className="space-y-2">
+                    {/* Disk usage bar */}
+                    <div className="relative w-full h-6 bg-slate-200 rounded overflow-hidden">
+                        <div 
+                            className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-blue-600" 
+                            style={{ width: `${Math.min(100, ((fsStats?.totalSize || 0) / (100 * 1024 * 1024)) * 100)}%` }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
+                            {formatBytes(fsStats?.totalSize || 0)} / 100 MB (DevFS)
+                        </div>
+                    </div>
+                    
+                    {/* Disk partitions */}
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="bg-white rounded p-2 border">
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-500">📁 Projects</span>
+                                <span className="font-bold text-blue-600">{Math.floor((fsStats?.folders || 0) * 0.6)}</span>
+                            </div>
+                            <div className="w-full h-1 bg-slate-100 rounded mt-1">
+                                <div className="h-full bg-blue-500 rounded" style={{ width: '45%' }}/>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded p-2 border">
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-500">📜 Scripts</span>
+                                <span className="font-bold text-green-600">{Math.floor((fsStats?.files || 0) * 0.3)}</span>
+                            </div>
+                            <div className="w-full h-1 bg-slate-100 rounded mt-1">
+                                <div className="h-full bg-green-500 rounded" style={{ width: '30%' }}/>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded p-2 border">
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-500">🖼️ Assets</span>
+                                <span className="font-bold text-purple-600">{Math.floor((fsStats?.files || 0) * 0.15)}</span>
+                            </div>
+                            <div className="w-full h-1 bg-slate-100 rounded mt-1">
+                                <div className="h-full bg-purple-500 rounded" style={{ width: '15%' }}/>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded p-2 border">
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-500">⚙️ Config</span>
+                                <span className="font-bold text-orange-600">{Math.floor((fsStats?.files || 0) * 0.1)}</span>
+                            </div>
+                            <div className="w-full h-1 bg-slate-100 rounded mt-1">
+                                <div className="h-full bg-orange-500 rounded" style={{ width: '10%' }}/>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* I/O Stats */}
+                    <div className="flex justify-between text-[10px] bg-slate-50 rounded p-2">
+                        <span className="text-slate-500">Read: <span className="text-green-600 font-mono">{Math.floor(Math.random() * 500) + 100} KB/s</span></span>
+                        <span className="text-slate-500">Write: <span className="text-blue-600 font-mono">{Math.floor(Math.random() * 200) + 50} KB/s</span></span>
+                        <span className="text-slate-500">IOPS: <span className="text-purple-600 font-mono">{Math.floor(Math.random() * 100) + 20}</span></span>
+                    </div>
+                </div>
+            </div>
         </div>
     )};
 
@@ -634,6 +698,48 @@ export const SettingsApp: React.FC<SettingsAppProps> = ({
                     <button className="py-2 bg-slate-200 hover:bg-slate-300 rounded text-xs text-slate-700">
                         🧹 Clear Logs
                     </button>
+                </div>
+            </div>
+
+            {/* Network Monitor - LAYER 3 */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded p-3">
+                <div className="text-sm font-bold text-slate-700 mb-2">🌐 Network Monitor</div>
+                <div className="space-y-2">
+                    {/* Active Connections */}
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-white rounded p-1.5 border border-green-200">
+                            <div className="text-lg font-bold text-green-600">{Math.floor(Math.random() * 10) + 3}</div>
+                            <div className="text-[9px] text-slate-500">Active</div>
+                        </div>
+                        <div className="bg-white rounded p-1.5 border border-blue-200">
+                            <div className="text-lg font-bold text-blue-600">{Math.floor(Math.random() * 20) + 5}</div>
+                            <div className="text-[9px] text-slate-500">Waiting</div>
+                        </div>
+                        <div className="bg-white rounded p-1.5 border border-red-200">
+                            <div className="text-lg font-bold text-red-600">{blockedConnections}</div>
+                            <div className="text-[9px] text-slate-500">Blocked</div>
+                        </div>
+                    </div>
+                    
+                    {/* Bandwidth */}
+                    <div className="bg-white/50 rounded p-2 text-[10px]">
+                        <div className="flex justify-between mb-1">
+                            <span className="text-slate-500">↓ Download</span>
+                            <span className="text-green-600 font-mono">{(Math.random() * 50 + 10).toFixed(1)} Mb/s</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-200 rounded">
+                            <div className="h-full bg-green-500 rounded animate-pulse" style={{ width: `${Math.random() * 60 + 20}%` }}/>
+                        </div>
+                    </div>
+                    <div className="bg-white/50 rounded p-2 text-[10px]">
+                        <div className="flex justify-between mb-1">
+                            <span className="text-slate-500">↑ Upload</span>
+                            <span className="text-blue-600 font-mono">{(Math.random() * 20 + 5).toFixed(1)} Mb/s</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-slate-200 rounded">
+                            <div className="h-full bg-blue-500 rounded animate-pulse" style={{ width: `${Math.random() * 40 + 10}%` }}/>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

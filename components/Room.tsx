@@ -9,11 +9,12 @@ interface RoomProps {
   onEnterComputer: () => void;
   onOpenPCInternals: () => void;
   onSleep: () => void;
+  onOpenJournal: () => void;
   onEquipItem?: (uid: string) => void; 
   onCleanItem?: (uid: string) => void;
 }
 
-export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInternals, onSleep, onEquipItem, onCleanItem }) => {
+export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInternals, onSleep, onOpenJournal, onEquipItem, onCleanItem }) => {
   const [customizingSlot, setCustomizingSlot] = useState<HardwareType | null>(null);
   const t = TRANSLATIONS[state.language];
 
@@ -406,6 +407,34 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
          className="absolute inset-0 bg-[#0f172a] pointer-events-none mix-blend-multiply transition-opacity duration-1000 z-50"
          style={{ opacity: nightOpacity }}
        ></div>
+       </div>
+
+       {/* Journal on nightstand - OUTSIDE the scaled container for proper click handling */}
+       <div 
+           onClick={(e) => { 
+               console.log('Journal clicked!'); 
+               e.stopPropagation(); 
+               onOpenJournal(); 
+               playSound('click'); 
+           }}
+           className="absolute bottom-[25%] right-[15%] md:right-[18%] w-12 h-16 md:w-16 md:h-20 cursor-pointer hover:scale-125 transition-all z-[100] group"
+           style={{ pointerEvents: 'auto' }}
+       >
+           <div className="w-full h-full bg-amber-800 rounded-sm border-l-4 border-amber-900 shadow-2xl relative overflow-hidden transform rotate-6 group-hover:rotate-0 transition-transform">
+               <div className="absolute inset-1 bg-amber-100 rounded-sm">
+                   <div className="p-1 text-[5px] md:text-[6px] text-amber-900 font-mono leading-tight font-bold">
+                       📓
+                   </div>
+                   <div className="mx-1 space-y-0.5">
+                       <div className="h-[2px] bg-amber-300 rounded"></div>
+                       <div className="h-[2px] bg-amber-300 rounded w-3/4"></div>
+                       <div className="h-[2px] bg-amber-300 rounded w-1/2"></div>
+                   </div>
+               </div>
+           </div>
+           <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-amber-300 font-bold text-xs bg-black/80 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg">
+               📓 Журнал
+           </div>
        </div>
     </div>
   );

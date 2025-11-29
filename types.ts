@@ -294,6 +294,11 @@ export interface GameState {
 
   // LAYER 5: Corporation Reputation
   corporationReps: CorporationReputation[];
+  
+  // LAYER 5+: Corporation Membership & Social
+  corpMembership?: CorpMembership; // Active corporation membership (can only be member of one)
+  activeCorpQuests: CorpQuest[]; // Currently active corp quests
+  completedCorpQuests: string[]; // IDs of completed quests
 
   // LAYER 7: Blueprints owned
   blueprints: Blueprint[];
@@ -368,11 +373,14 @@ export interface GameState {
   notifications: Notification[];
   unlockedAchievements: string[]; // Achievement IDs
 
+  // LAYER 0: Desktop Layout Persistence
+  desktopLayout?: DesktopItem[]; // Saved icon positions
+
   // LAYER 28: ANG Vers Social State
   angVersState?: ANGVersState;
 }
 
-export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'profile' | string;
+export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | string;
 
 // LAYER 1: DevFS Types
 export interface DevFile {
@@ -431,6 +439,255 @@ export interface CorporationReputation {
   rank: 'враг' | 'нейтрал' | 'знакомый' | 'партнёр' | 'союзник' | 'элита';
   totalContracts: number;
   lastInteraction: number; // timestamp
+}
+
+// ============================================
+// LAYER 5+: Corporation Membership & Social System
+// ============================================
+export type CorpMemberRank = 'recruit' | 'member' | 'specialist' | 'manager' | 'director' | 'executive';
+
+export interface CorpMembership {
+  corporationId: CorporationId;
+  joinedAt: number; // timestamp
+  rank: CorpMemberRank;
+  xp: number; // XP within corporation
+  monthlyDuesPaid: boolean;
+  privileges: CorpPrivilege[];
+  contributions: number; // Total contributions to corp
+  questsCompleted: number;
+  isActive: boolean;
+}
+
+export type CorpPrivilege = 
+  | 'access_labs'           // Access to corporation labs
+  | 'access_blueprints'     // Access to blueprint vault
+  | 'access_ai_cores'       // Use AI cores
+  | 'access_contracts'      // Take contracts
+  | 'access_exclusive_shop' // Buy exclusive items
+  | 'voting_rights'         // Vote on corp decisions
+  | 'start_projects'        // Start corp research projects
+  | 'manage_members'        // Manage lower rank members
+  | 'war_participation'     // Participate in corp wars
+  | 'dividend_share';       // Get share of corp profits
+
+// Corporation Quest System
+export type CorpQuestType = 'daily' | 'weekly' | 'story' | 'elite' | 'war';
+export type CorpQuestStatus = 'available' | 'active' | 'completed' | 'failed' | 'expired';
+
+export interface CorpQuestReward {
+  money?: number;
+  shadowCredits?: number;
+  reputation?: number;
+  xp?: number;
+  blueprintId?: string;
+  itemId?: string;
+  privilege?: CorpPrivilege;
+}
+
+export interface CorpQuest {
+  id: string;
+  corporationId: CorporationId;
+  type: CorpQuestType;
+  title: string;
+  description: string;
+  icon: string;
+  
+  // Requirements
+  requiredRank: CorpMemberRank;
+  requiredReputation: number;
+  requiredSkills?: { skillId: string; level: number }[];
+  
+  // Objectives
+  objectives: {
+    type: 'code_lines' | 'complete_projects' | 'earn_money' | 'craft_items' | 'hack_systems' | 'recruit_members' | 'sabotage' | 'defend' | 'custom';
+    target: number;
+    current: number;
+    description: string;
+  }[];
+  
+  // Rewards
+  rewards: CorpQuestReward;
+  bonusRewards?: CorpQuestReward; // For perfect completion
+  
+  // Timing
+  expiresAt?: number; // For daily/weekly quests
+  cooldown?: number; // Minutes until available again
+  
+  // Status
+  status: CorpQuestStatus;
+  startedAt?: number;
+  completedAt?: number;
+}
+
+// Corporation Labs & Research
+export type LabType = 'research' | 'manufacturing' | 'ai_development' | 'quantum' | 'cybersecurity';
+export type LabTier = 1 | 2 | 3 | 4 | 5;
+
+export interface CorpLab {
+  id: string;
+  corporationId: CorporationId;
+  type: LabType;
+  name: string;
+  tier: LabTier;
+  icon: string;
+  
+  // Capacity
+  aiCores: AICore[];
+  maxCores: number;
+  blueprintVault: string[]; // Blueprint IDs stored here
+  maxBlueprints: number;
+  
+  // Current research
+  activeResearch?: ResearchProject;
+  completedResearch: string[];
+  
+  // Stats
+  efficiency: number; // 0-100
+  securityLevel: number; // 0-100
+  powerConsumption: number;
+  
+  // Access
+  requiredRank: CorpMemberRank;
+  isLocked: boolean;
+}
+
+export interface AICore {
+  id: string;
+  name: string;
+  type: 'basic' | 'advanced' | 'quantum' | 'neural' | 'experimental';
+  tier: BlueprintTier;
+  power: number; // Processing power
+  efficiency: number; // Energy efficiency
+  specialization?: 'coding' | 'research' | 'security' | 'trading' | 'general';
+  isActive: boolean;
+  installedAt: number;
+  corporationId: CorporationId;
+}
+
+export interface ResearchProject {
+  id: string;
+  labId: string;
+  name: string;
+  description: string;
+  type: 'blueprint' | 'upgrade' | 'ai_improvement' | 'secret_tech' | 'weapon';
+  
+  // Progress
+  progress: number; // 0-100
+  totalTime: number; // Minutes to complete
+  startedAt: number;
+  
+  // Requirements
+  requiredCores: number;
+  requiredBlueprints: string[];
+  cost: { money: number; shadowCredits?: number };
+  
+  // Rewards
+  rewardBlueprint?: Omit<Blueprint, 'id' | 'unlockedAt'>;
+  rewardUpgrade?: { type: string; value: number };
+  
+  // Contributors
+  contributors: { playerId: string; contribution: number }[];
+}
+
+// Corporation Wars & Competition
+export type WarStatus = 'pending' | 'active' | 'ceasefire' | 'ended';
+export type WarType = 'influence' | 'territory' | 'resource' | 'annihilation';
+
+export interface CorpWar {
+  id: string;
+  type: WarType;
+  status: WarStatus;
+  
+  // Combatants
+  attackerId: CorporationId;
+  defenderId: CorporationId;
+  
+  // Scores
+  attackerScore: number;
+  defenderScore: number;
+  
+  // Participants
+  attackerMembers: string[];
+  defenderMembers: string[];
+  
+  // Timeline
+  declaredAt: number;
+  startedAt?: number;
+  endsAt?: number;
+  
+  // Stakes
+  stakes: {
+    territory?: string;
+    influence?: number;
+    blueprints?: string[];
+    credits?: number;
+  };
+  
+  // Events
+  events: WarEvent[];
+}
+
+export interface WarEvent {
+  id: string;
+  warId: string;
+  timestamp: number;
+  type: 'attack' | 'defend' | 'sabotage' | 'hack' | 'steal' | 'recruit' | 'alliance';
+  actorId: string; // Player ID
+  actorCorp: CorporationId;
+  targetCorp: CorporationId;
+  points: number;
+  description: string;
+}
+
+// Corporation Alliance System
+export interface CorpAlliance {
+  id: string;
+  name: string;
+  foundedAt: number;
+  members: CorporationId[];
+  leader: CorporationId;
+  
+  // Benefits
+  sharedResearch: boolean;
+  tradingBonus: number;
+  defenseBonus: number;
+  
+  // Requirements
+  minimumTier: CorporationTier;
+  membershipFee: number;
+}
+
+// Extended Corporation Interface (full data)
+export interface CorporationFull extends Corporation {
+  // Membership
+  memberCount: number;
+  maxMembers: number;
+  membershipFee: number; // Monthly dues
+  recruitmentOpen: boolean;
+  
+  // Labs
+  labs: CorpLab[];
+  totalAICores: number;
+  researchSpeed: number;
+  
+  // Quests
+  activeQuests: CorpQuest[];
+  questRefreshTime: number;
+  
+  // Wars
+  activeWars: string[]; // War IDs
+  warScore: number;
+  warRank: number;
+  
+  // Economy
+  treasury: number;
+  weeklyIncome: number;
+  dividendPool: number;
+  
+  // Alliance
+  allianceId?: string;
+  allies: CorporationId[];
+  enemies: CorporationId[];
 }
 
 // ============================================

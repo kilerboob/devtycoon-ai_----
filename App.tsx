@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { INITIAL_GAME_STATE, CODE_SNIPPETS, LEARNING_QUESTS, HARDWARE_CATALOG, SKILL_TREE, FILE_SYSTEM_INIT, BANK_CONSTANTS, NEWS_TEMPLATES, EMAIL_TEMPLATES, ACHIEVEMENTS } from './constants';
-import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole, Blueprint } from './types';
+import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole, Blueprint, CorporationId, CorpMembership, CorpQuest, DesktopItem } from './types';
 import { Room } from './components/Room';
 import { Desktop } from './components/Desktop';
 import { StoryModal } from './components/StoryModal';
@@ -20,6 +20,7 @@ import { MatrixBackground } from './components/MatrixBackground';
 import { EndingScreen } from './components/EndingScreen';
 import { NotificationContainer } from './components/NotificationContainer';
 import { AchievementsApp } from './components/AchievementsApp';
+import { JournalApp } from './components/JournalApp';
 
 import ConfirmModal from './components/ConfirmModal';
 import UndoSnackbar from './components/UndoSnackbar';
@@ -85,6 +86,7 @@ export default function App() {
 
     const [view, setView] = useState<'ROOM' | 'DESKTOP'>('ROOM');
     const [isPCBuildMode, setIsPCBuildMode] = useState(false);
+    const [isJournalOpen, setIsJournalOpen] = useState(false);
     const [isHacking, setIsHacking] = useState(false);
     const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
     const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -398,7 +400,12 @@ export default function App() {
                     isGameWon: !!savedState.isGameWon,
                     // Notification & Achievement System
                     notifications: savedState.notifications || [],
-                    unlockedAchievements: savedState.unlockedAchievements || []
+                    unlockedAchievements: savedState.unlockedAchievements || [],
+                    // LAYER 5: Corporation membership (new fields)
+                    corporationReps: savedState.corporationReps || INITIAL_GAME_STATE.corporationReps,
+                    corpMembership: savedState.corpMembership || undefined,
+                    activeCorpQuests: savedState.activeCorpQuests || [],
+                    completedCorpQuests: savedState.completedCorpQuests || []
                 };
 
                 setGameState(sanitizedState);
@@ -829,6 +836,223 @@ export default function App() {
         }));
         addNotification('Новый чертёж!', `Получен: ${blueprint.name} (${blueprint.tier})`, 'success', '📜');
         playSound('success');
+    };
+
+    // LAYER 7: Craft from Blueprint
+    const handleCraftBlueprint = (blueprint: Blueprint, craftedItem: any) => {
+        // Convert to inventory item
+        const newInventoryItem: InventoryItem = {
+            uid: `crafted_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            itemId: `crafted_${blueprint.type}_${blueprint.tier}`,
+            isStolen: blueprint.isStolen || false,
+            durability: 100,
+        };
+        
+        setGameState(prev => ({
+            ...prev,
+            inventory: [...prev.inventory, newInventoryItem],
+            // Optionally remove blueprint after crafting (uncomment if needed)
+            // blueprints: prev.blueprints.filter(bp => bp.id !== blueprint.id)
+        }));
+        
+        addNotification('Компонент создан!', `${craftedItem.name} добавлен в инвентарь`, 'success', '🔧');
+        playSound('success');
+    };
+
+    // LAYER 7: Sell Blueprint
+    const handleSellBlueprint = (blueprint: Blueprint) => {
+        const value = blueprint.marketValue || 100;
+        
+        setGameState(prev => ({
+            ...prev,
+            money: prev.money + value,
+            blueprints: prev.blueprints.filter(bp => bp.id !== blueprint.id)
+        }));
+        
+        addNotification('Чертёж продан!', `+$${value.toLocaleString()}`, 'success', '💰');
+        playSound('success');
+    };
+
+    // LAYER 7: Spend money (for crafting)
+    const handleSpendMoney = (amount: number) => {
+        setGameState(prev => ({
+            ...prev,
+            money: Math.max(0, prev.money - amount)
+        }));
+    };
+
+    // LAYER 7: Spend shadow credits (for crafting)
+    const handleSpendShadowCredits = (amount: number) => {
+        setGameState(prev => ({
+            ...prev,
+            shadowCredits: Math.max(0, prev.shadowCredits - amount)
+        }));
+    };
+
+    // LAYER 5: Corporation handlers
+    const handleJoinCorp = (corpId: CorporationId) => {
+        // Check if already in a corp
+        if (gameState.corpMembership?.isActive) {
+            addNotification('Ошибка', 'Вы уже состоите в корпорации. Сначала выйдите.', 'error', '🚫');
+            playSound('error');
+            return;
+        }
+
+        // Check reputation (need at least -10)
+        const rep = gameState.corporationReps.find(r => r.corporationId === corpId);
+        if (rep && rep.reputation < -10) {
+            addNotification('Ошибка', 'Ваша репутация слишком низкая для вступления.', 'error', '🚫');
+            playSound('error');
+            return;
+        }
+
+        const newMembership: CorpMembership = {
+            corporationId: corpId,
+            joinedAt: Date.now(),
+            rank: 'recruit',
+            xp: 0,
+            monthlyDuesPaid: true, // First month free
+            privileges: ['access_contracts'],
+            contributions: 0,
+            questsCompleted: 0,
+            isActive: true
+        };
+
+        setGameState(prev => ({
+            ...prev,
+            corpMembership: newMembership
+        }));
+
+        const corpName = gameState.corporationReps.find(r => r.corporationId === corpId)?.corporationId || corpId;
+        addNotification('Добро пожаловать!', `Вы вступили в корпорацию как Рекрут`, 'success', '🏢');
+        playSound('success');
+    };
+
+    const handleLeaveCorp = () => {
+        if (!gameState.corpMembership?.isActive) {
+            return;
+        }
+
+        const corpId = gameState.corpMembership.corporationId;
+        const rankIndex = ['recruit', 'member', 'specialist', 'manager', 'director', 'executive'].indexOf(gameState.corpMembership.rank);
+        const reputationPenalty = (rankIndex + 1) * -5; // -5 to -30
+
+        setGameState(prev => ({
+            ...prev,
+            corpMembership: undefined,
+            corporationReps: prev.corporationReps.map(rep => 
+                rep.corporationId === corpId 
+                    ? { ...rep, reputation: Math.max(-100, rep.reputation + reputationPenalty) }
+                    : rep
+            )
+        }));
+
+        addNotification('Вы покинули корпорацию', `Штраф репутации: ${reputationPenalty}`, 'info', '🚪');
+        playSound('click');
+    };
+
+    const handleStartQuest = (quest: CorpQuest) => {
+        if (!gameState.corpMembership?.isActive) {
+            addNotification('Ошибка', 'Вы не состоите в корпорации', 'error', '🚫');
+            return;
+        }
+
+        // Check if already on too many quests
+        const activeQuests = gameState.activeCorpQuests || [];
+        if (activeQuests.length >= 3) {
+            addNotification('Ошибка', 'Максимум 3 активных задания', 'error', '🚫');
+            return;
+        }
+
+        // Check if already doing this quest
+        if (activeQuests.some(q => q.id === quest.id)) {
+            addNotification('Ошибка', 'Это задание уже активно', 'error', '🚫');
+            return;
+        }
+
+        const questWithProgress = {
+            ...quest,
+            startedAt: Date.now(),
+            progress: quest.objectives.map(() => 0)
+        };
+
+        setGameState(prev => ({
+            ...prev,
+            activeCorpQuests: [...(prev.activeCorpQuests || []), questWithProgress]
+        }));
+
+        addNotification('Задание принято', quest.title, 'success', '📋');
+        playSound('success');
+    };
+
+    const handleCollectQuestReward = (quest: CorpQuest) => {
+        const activeQuests = gameState.activeCorpQuests || [];
+        const activeQuest = activeQuests.find(q => q.id === quest.id) as (CorpQuest & { progress?: number[] }) | undefined;
+        
+        if (!activeQuest) return;
+
+        // Check if all objectives complete
+        const isComplete = quest.objectives.every((obj, i) => {
+            const progress = activeQuest.progress?.[i] || 0;
+            return progress >= obj.target;
+        });
+
+        if (!isComplete) {
+            addNotification('Задание не завершено', 'Выполните все цели', 'error', '🚫');
+            return;
+        }
+
+        // Apply rewards
+        setGameState(prev => ({
+            ...prev,
+            money: prev.money + (quest.rewards.money || 0),
+            shadowCredits: prev.shadowCredits + (quest.rewards.shadowCredits || 0),
+            corporationReps: prev.corporationReps.map(rep =>
+                rep.corporationId === quest.corporationId
+                    ? { ...rep, reputation: Math.min(100, rep.reputation + (quest.rewards.reputation || 0)) }
+                    : rep
+            ),
+            activeCorpQuests: (prev.activeCorpQuests || []).filter(q => q.id !== quest.id),
+            completedCorpQuests: [...(prev.completedCorpQuests || []), quest.id],
+            corpMembership: prev.corpMembership ? {
+                ...prev.corpMembership,
+                xp: prev.corpMembership.xp + (quest.rewards.xp || 50),
+                questsCompleted: prev.corpMembership.questsCompleted + 1
+            } : undefined
+        }));
+
+        addNotification('Награда получена!', `+$${quest.rewards.money || 0}`, 'success', '🎁');
+        playSound('success');
+    };
+
+    const handlePayCorpDues = () => {
+        if (!gameState.corpMembership?.isActive) return;
+
+        const duesAmount = 500; // Base monthly dues
+        if (gameState.money < duesAmount) {
+            addNotification('Недостаточно средств', `Нужно $${duesAmount}`, 'error', '💰');
+            return;
+        }
+
+        setGameState(prev => ({
+            ...prev,
+            money: prev.money - duesAmount,
+            corpMembership: prev.corpMembership ? {
+                ...prev.corpMembership,
+                monthlyDuesPaid: true
+            } : undefined
+        }));
+
+        addNotification('Взнос оплачен', `$${duesAmount}`, 'success', '✅');
+        playSound('success');
+    };
+
+    // LAYER 0: Desktop Layout Persistence
+    const handleSaveDesktopLayout = (layout: DesktopItem[]) => {
+        setGameState(prev => ({
+            ...prev,
+            desktopLayout: layout
+        }));
     };
 
     const handleRestart = async () => {
@@ -1766,12 +1990,20 @@ export default function App() {
                 />
             )}
 
+            {isJournalOpen && (
+                <JournalApp
+                    state={gameState}
+                    onClose={() => setIsJournalOpen(false)}
+                />
+            )}
+
             {view === 'ROOM' ? (
                 <Room
                     state={gameState}
                     onEnterComputer={() => { playSound('click'); setView('DESKTOP'); }}
                     onOpenPCInternals={() => { playSound('click'); setIsPCBuildMode(true); }}
                     onSleep={handleSleep}
+                    onOpenJournal={() => { console.log('onOpenJournal called!'); playSound('click'); setIsJournalOpen(true); }}
                     onEquipItem={handleEquipInternal}
                     onCleanItem={handleCleanItem}
                 />
@@ -1812,6 +2044,18 @@ export default function App() {
                     onNotify={addNotification}
                     // LAYER 7: Blueprints
                     onAddBlueprint={handleAddBlueprint}
+                    onCraftBlueprint={handleCraftBlueprint}
+                    onSellBlueprint={handleSellBlueprint}
+                    onSpendMoney={handleSpendMoney}
+                    onSpendShadowCredits={handleSpendShadowCredits}
+                    // LAYER 5: Corporations
+                    onJoinCorp={handleJoinCorp}
+                    onLeaveCorp={handleLeaveCorp}
+                    onStartQuest={handleStartQuest}
+                    onCollectReward={handleCollectQuestReward}
+                    onPayDues={handlePayCorpDues}
+                    // LAYER 0: Desktop Layout
+                    onSaveDesktopLayout={handleSaveDesktopLayout}
                 />
             )}
 

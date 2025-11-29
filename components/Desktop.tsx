@@ -18,6 +18,9 @@ import { BankApp } from './BankApp';
 import { StorageApp } from './StorageApp';
 import { CorporationsApp } from './CorporationsApp';
 import { BlueprintsApp } from './BlueprintsApp';
+import { TutorialGuide } from './TutorialGuide';
+import { CodeEditor } from './CodeEditor';
+import { SocialHub } from './SocialHub';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -236,6 +239,18 @@ interface DesktopProps {
   onNotify?: (title: string, message: string, type?: 'info'|'error'|'success'|'achievement', icon?: string, duration?: number) => void;
   // LAYER 7: Blueprints
   onAddBlueprint?: (blueprint: import('../types').Blueprint) => void;
+  onCraftBlueprint?: (blueprint: import('../types').Blueprint, craftedItem: any) => void;
+  onSellBlueprint?: (blueprint: import('../types').Blueprint) => void;
+  onSpendMoney?: (amount: number) => void;
+  onSpendShadowCredits?: (amount: number) => void;
+  // LAYER 5: Corporations
+  onJoinCorp?: (corpId: import('../types').CorporationId) => void;
+  onLeaveCorp?: () => void;
+  onStartQuest?: (quest: import('../types').CorpQuest) => void;
+  onCollectReward?: (quest: import('../types').CorpQuest) => void;
+  onPayDues?: () => void;
+  // LAYER 0: Desktop Layout Persistence
+  onSaveDesktopLayout?: (layout: import('../types').DesktopItem[]) => void;
 }
 
 // --- DESKTOP CONSTANTS ---
@@ -270,10 +285,14 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'leaderboard', type: 'app', title: 'Ranking', icon: '🏆', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y, appId: 'leaderboard' },
     // Corporations App (LAYER 28: ANG Vers + others)
     { id: 'corporations', type: 'app', title: 'Corps', icon: '🏢', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H, appId: 'corporations' },
+    // Social Hub (LAYER 10-12: P2P Contracts & Guilds)
+    { id: 'social', type: 'app', title: 'SocialHub', icon: '👥', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'social' },
+    // Tutorial Guide App - Help system with all features walkthrough
+    { id: 'tutorial', type: 'app', title: 'Гайд', icon: '📖', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'tutorial' },
     // System folder shortcuts - open StorageApp with initial path
-    { id: 'folder-projects', type: 'folder', title: 'Проекты', icon: '📂', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'devfs' },
-    { id: 'folder-sites', type: 'folder', title: 'Сайты', icon: '🌐', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 3, appId: 'devfs' },
-    { id: 'folder-storage', type: 'folder', title: 'Хранилище', icon: '📦', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 4, appId: 'devfs' },
+    { id: 'folder-projects', type: 'folder', title: 'Проекты', icon: '📂', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H, appId: 'devfs' },
+    { id: 'folder-sites', type: 'folder', title: 'Сайты', icon: '🌐', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H * 2, appId: 'devfs' },
+    { id: 'folder-storage', type: 'folder', title: 'Хранилище', icon: '📦', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H * 3, appId: 'devfs' },
 ];
 
 export const Desktop: React.FC<DesktopProps> = (props) => {
@@ -291,6 +310,9 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
   const [fileContent, setFileContent] = useState('');
   const [newFileName, setNewFileName] = useState('');
   const [showNewFileInp, setShowNewFileInp] = useState<'file'|'folder'|null>(null);
+  const [ideSearchQuery, setIdeSearchQuery] = useState('');
+  const [ideSearchResults, setIdeSearchResults] = useState<{file: FileNode, matches: number}[]>([]);
+  const [fileWatcherNotifications, setFileWatcherNotifications] = useState<{path: string, event: string, time: number}[]>([]);
   const [builderCode, setBuilderCode] = useState(`<html>...</html>`);
   const [graphNodes, setGraphNodes] = useState<GraphNode[]>([]);
   const [graphConnections, setGraphConnections] = useState<GraphConnection[]>([]);
@@ -303,8 +325,26 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
             // Local saving status for UI badge: 'idle' | 'saving' | 'saved' | 'error'
             const [savingStatus, setSavingStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle');
 
-  // Desktop Icons State
-  const [desktopItems, setDesktopItems] = useState<DesktopItem[]>(SYSTEM_APPS);
+  // Desktop Icons State - load from saved layout or use defaults
+  const [desktopItems, setDesktopItems] = useState<DesktopItem[]>(() => {
+    // If we have saved layout, merge with SYSTEM_APPS to ensure new apps are included
+    if (props.state.desktopLayout && props.state.desktopLayout.length > 0) {
+      const savedMap = new Map(props.state.desktopLayout.map(item => [item.id, item]));
+      // Merge: use saved positions for existing items, add new system apps
+      const merged = SYSTEM_APPS.map(sysApp => {
+        const saved = savedMap.get(sysApp.id);
+        return saved ? { ...sysApp, x: saved.x, y: saved.y } : sysApp;
+      });
+      // Add any user-created items that are in saved but not in SYSTEM_APPS
+      props.state.desktopLayout.forEach(saved => {
+        if (!SYSTEM_APPS.find(s => s.id === saved.id)) {
+          merged.push(saved);
+        }
+      });
+      return merged;
+    }
+    return SYSTEM_APPS;
+  });
   const [iconSize, setIconSize] = useState<'small' | 'medium'>('medium');
   const [dragItem, setDragItem] = useState<{id: string, startX: number, startY: number, initX: number, initY: number} | null>(null);
   const [openFolders, setOpenFolders] = useState<string[]>([]);
@@ -314,6 +354,14 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
   const [storageAppPath, setStorageAppPath] = useState<string | undefined>(undefined);
 
   const t = TRANSLATIONS[props.state.language];
+
+  // Ensure all SYSTEM_APPS are present (for new apps added after save)
+  useEffect(() => {
+    const missingApps = SYSTEM_APPS.filter(sysApp => !desktopItems.find(item => item.id === sysApp.id));
+    if (missingApps.length > 0) {
+      setDesktopItems(prev => [...prev, ...missingApps]);
+    }
+  }, []); // Run once on mount
 
   // Global hotkey to toggle Start Menu (Alt+S)
   useEffect(() => {
@@ -370,6 +418,40 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
           return () => clearTimeout(timer);
       }
   }, [fileContent, activeFile]);
+
+  // File Watcher - подписка на изменения файловой системы
+  useEffect(() => {
+    if (activeApp === 'ide') {
+      const unsubscribe = devFsService.registerListener((event) => {
+        // Добавить уведомление о изменении
+        const notification = {
+          path: event.path,
+          event: event.type === 'create' ? 'Created' : event.type === 'delete' ? 'Deleted' : 'Modified',
+          time: Date.now()
+        };
+        setFileWatcherNotifications(prev => [...prev.slice(-4), notification]);
+        
+        // Показать toast
+        if (props.onNotify) {
+          const icon = event.type === 'create' ? '📄' : event.type === 'delete' ? '🗑️' : '✏️';
+          props.onNotify(
+            `File ${notification.event}`,
+            event.path.split('/').pop() || event.path,
+            event.type === 'delete' ? 'error' : 'info',
+            icon,
+            2000
+          );
+        }
+        
+        // Автоочистка через 5 сек
+        setTimeout(() => {
+          setFileWatcherNotifications(prev => prev.filter(n => n.time !== notification.time));
+        }, 5000);
+      });
+      
+      return () => unsubscribe();
+    }
+  }, [activeApp]);
 
   // Load project graph when IDE opens with active project
   useEffect(() => {
@@ -485,6 +567,31 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
       }
   };
 
+  // Поиск в файлах
+  const handleIdeSearch = (query: string) => {
+    setIdeSearchQuery(query);
+    if (!query.trim()) {
+      setIdeSearchResults([]);
+      return;
+    }
+    
+    const results: {file: FileNode, matches: number}[] = [];
+    const searchInNode = (node: FileNode) => {
+      if (node.type === 'file' && node.content) {
+        const regex = new RegExp(query, 'gi');
+        const matches = (node.content.match(regex) || []).length;
+        if (matches > 0) {
+          results.push({ file: node, matches });
+        }
+      }
+      if (node.children) {
+        node.children.forEach(searchInNode);
+      }
+    };
+    searchInNode(props.state.fileSystem);
+    setIdeSearchResults(results.sort((a, b) => b.matches - a.matches));
+  };
+
   const toggleApp = (app: AppId) => {
     playSound('click');
     if (activeApp === app) {
@@ -569,12 +676,17 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                       playSound('error');
                   } else {
                       // Apply Snap
-                      setDesktopItems(prev => prev.map(item => 
+                      const newItems = desktopItems.map(item => 
                           item.id === dragItem.id 
                               ? { ...item, x: snapX, y: snapY } 
                               : item
-                      ));
+                      );
+                      setDesktopItems(newItems);
                       playSound('click');
+                      // LAYER 0: Save desktop layout
+                      if (props.onSaveDesktopLayout) {
+                          props.onSaveDesktopLayout(newItems);
+                      }
                   }
               }
           }
@@ -615,6 +727,36 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
           setIconSize('small');
       } else if (action === 'size_medium') {
           setIconSize('medium');
+      } else if (action === 'sort_by_name') {
+          // Sort icons by name and arrange in grid
+          const sorted = [...desktopItems].sort((a, b) => a.title.localeCompare(b.title));
+          const arranged = sorted.map((item, idx) => {
+              const col = Math.floor(idx / 6);
+              const row = idx % 6;
+              return { ...item, x: MARGIN_X + col * GRID_W, y: MARGIN_Y + row * GRID_H };
+          });
+          setDesktopItems(arranged);
+      } else if (action === 'sort_by_type') {
+          // Sort: folders first, then apps, then by name
+          const sorted = [...desktopItems].sort((a, b) => {
+              if (a.type === 'folder' && b.type !== 'folder') return -1;
+              if (a.type !== 'folder' && b.type === 'folder') return 1;
+              return a.title.localeCompare(b.title);
+          });
+          const arranged = sorted.map((item, idx) => {
+              const col = Math.floor(idx / 6);
+              const row = idx % 6;
+              return { ...item, x: MARGIN_X + col * GRID_W, y: MARGIN_Y + row * GRID_H };
+          });
+          setDesktopItems(arranged);
+      } else if (action === 'auto_arrange') {
+          // Auto-arrange icons to remove gaps
+          const arranged = desktopItems.map((item, idx) => {
+              const col = Math.floor(idx / 6);
+              const row = idx % 6;
+              return { ...item, x: MARGIN_X + col * GRID_W, y: MARGIN_Y + row * GRID_H };
+          });
+          setDesktopItems(arranged);
       } else if (action === 'delete' && contextMenu?.targetId) {
           // Only delete user apps or empty folders
           setDesktopItems(prev => prev.filter(i => i.id !== contextMenu.targetId));
@@ -724,19 +866,48 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
 
       {/* CONTEXT MENU */}
       {contextMenu && (
-          <div className="absolute z-[100] bg-slate-800 border border-slate-600 rounded shadow-2xl py-1 w-40 text-sm" style={{ top: contextMenu.y, left: contextMenu.x }}>
+          <div className="absolute z-[100] bg-slate-800 border border-slate-600 rounded shadow-2xl py-1 w-48 text-sm" style={{ top: contextMenu.y, left: contextMenu.x }}>
               {contextMenu.targetId ? (
-                  <>
-                    <button onClick={() => toggleApp(desktopItems.find(i => i.id === contextMenu.targetId)?.appId || '')} className="w-full text-left px-3 py-1 hover:bg-blue-600 text-white">Open</button>
-                    <button onClick={() => handleContextMenuAction('delete')} className="w-full text-left px-3 py-1 hover:bg-red-600 text-red-300">Delete</button>
-                  </>
+                  (() => {
+                    const targetItem = desktopItems.find(i => i.id === contextMenu.targetId);
+                    const isSystemApp = SYSTEM_APPS.some(s => s.id === contextMenu.targetId);
+                    const isUserApp = props.state.userApps.some(a => a.id === contextMenu.targetId);
+                    const isUserFolder = targetItem?.type === 'folder' && !targetItem.id.startsWith('folder-');
+                    // Can delete: user apps, user-created folders (not system folders)
+                    const canDelete = isUserApp || isUserFolder;
+                    return (
+                      <>
+                        <button onClick={() => toggleApp(targetItem?.appId || '')} className="w-full text-left px-3 py-1.5 hover:bg-blue-600 text-white flex items-center gap-2">
+                          <span>🔓</span> Open
+                        </button>
+                        {targetItem && (
+                          <div className="px-3 py-1 text-slate-500 text-xs border-t border-slate-700 mt-1">
+                            {targetItem.title} {isUserApp ? '(User App)' : isSystemApp ? '(System)' : ''}
+                          </div>
+                        )}
+                        {canDelete && (
+                          <button onClick={() => handleContextMenuAction('delete')} className="w-full text-left px-3 py-1.5 hover:bg-red-600 text-red-300 flex items-center gap-2">
+                            <span>🗑️</span> Uninstall
+                          </button>
+                        )}
+                        {isSystemApp && !isUserApp && (
+                          <div className="px-3 py-1 text-slate-500 text-xs italic">Protected system app</div>
+                        )}
+                      </>
+                    );
+                  })()
               ) : (
                   <>
-                    <button onClick={() => handleContextMenuAction('new_folder')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">New Folder</button>
+                    <button onClick={() => handleContextMenuAction('new_folder')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">📁 New Folder</button>
+                    <div className="border-t border-slate-700 my-1"></div>
+                    <div className="px-3 py-1 text-xs text-slate-500">Sort by</div>
+                    <button onClick={() => handleContextMenuAction('sort_by_name')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">🔤 By Name</button>
+                    <button onClick={() => handleContextMenuAction('sort_by_type')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">📂 By Type</button>
+                    <button onClick={() => handleContextMenuAction('auto_arrange')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">🧹 Auto Arrange</button>
                     <div className="border-t border-slate-700 my-1"></div>
                     <div className="px-3 py-1 text-xs text-slate-500">View</div>
-                    <button onClick={() => handleContextMenuAction('size_medium')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">Medium Icons</button>
-                    <button onClick={() => handleContextMenuAction('size_small')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">Small Icons</button>
+                    <button onClick={() => handleContextMenuAction('size_medium')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">🔲 Medium Icons</button>
+                    <button onClick={() => handleContextMenuAction('size_small')} className="w-full text-left px-3 py-1 hover:bg-slate-700 text-white">🔳 Small Icons</button>
                   </>
               )}
           </div>
@@ -787,6 +958,32 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                                 <button onClick={() => setShowNewFileInp('file')} className="p-1 hover:bg-slate-700 rounded text-slate-400" title="New File">📄+</button>
                                 <button onClick={() => setShowNewFileInp('folder')} className="p-1 hover:bg-slate-700 rounded text-slate-400" title="New Folder">📁+</button>
                             </div>
+                            {/* Search in files */}
+                            <div className="p-2 border-b border-slate-800">
+                                <div className="relative">
+                                    <input 
+                                        value={ideSearchQuery}
+                                        onChange={(e) => handleIdeSearch(e.target.value)}
+                                        className="w-full bg-slate-800 text-white text-xs px-2 py-1.5 pl-7 rounded outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="Search in files..."
+                                    />
+                                    <span className="absolute left-2 top-1.5 text-slate-500">🔍</span>
+                                </div>
+                                {ideSearchResults.length > 0 && (
+                                    <div className="mt-2 max-h-32 overflow-y-auto">
+                                        {ideSearchResults.map((r, i) => (
+                                            <button 
+                                                key={i}
+                                                onClick={() => { handleFileSelect(r.file); setIdeSearchQuery(''); setIdeSearchResults([]); }}
+                                                className="w-full text-left px-2 py-1 hover:bg-slate-700 rounded text-[10px] flex justify-between items-center"
+                                            >
+                                                <span className="text-slate-300 truncate">{r.file.name}</span>
+                                                <span className="text-yellow-400 font-mono">{r.matches}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             {showNewFileInp && (
                                 <form onSubmit={(e) => { e.preventDefault(); if(newFileName.trim()) { props.onCreateFile('root', newFileName, showNewFileInp); setShowNewFileInp(null); setNewFileName(''); } }} className="p-2 border-b border-slate-800">
                                     <input autoFocus className="w-full bg-slate-800 text-white text-xs px-2 py-1 rounded outline-none" placeholder={`New ${showNewFileInp}...`} value={newFileName} onChange={e => setNewFileName(e.target.value)} onBlur={() => setShowNewFileInp(null)} />
@@ -796,6 +993,18 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                                 <div className="text-xs text-slate-500 uppercase font-bold mb-2">EXPLORER</div>
                                 <FileTreeItem node={props.state.fileSystem} depth={0} onSelect={handleFileSelect} onToggle={() => {}} selectedId={activeFile?.id} />
                             </div>
+                            {/* File Watcher Notifications */}
+                            {fileWatcherNotifications.length > 0 && (
+                              <div className="p-2 border-t border-slate-800 bg-[#161b22]/50">
+                                <div className="text-[9px] text-slate-500 uppercase mb-1">Recent Changes</div>
+                                {fileWatcherNotifications.map((n, i) => (
+                                  <div key={i} className="flex items-center gap-1 text-[10px] py-0.5 animate-pulse">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${n.event === 'Created' ? 'bg-green-500' : n.event === 'Deleted' ? 'bg-red-500' : 'bg-blue-500'}`}></span>
+                                    <span className="text-slate-400 truncate">{n.path.split('/').pop()}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             <div className="p-2 border-t border-slate-800 bg-[#161b22]">
                                 <div className="text-[10px] text-slate-400 mb-1 flex justify-between"><span>Storage</span><span>{props.storageStats.usedGB.toFixed(2)} GB</span></div>
                                 <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden"><div className="h-full bg-blue-500" style={{ width: `${Math.min(100, (props.storageStats.usedGB / props.storageStats.totalCapacity) * 100)}%` }}></div></div>
@@ -805,7 +1014,15 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                             {activeFile ? (
                                 <>
                                     <div className="h-8 bg-[#0d1117] flex border-b border-slate-700 overflow-x-auto"><div className="px-4 py-1 text-xs text-slate-300 bg-[#1e1e1e] border-r border-slate-700 border-t-2 border-t-blue-500 flex items-center gap-2"><span>{activeFile.name}</span><button onClick={() => setActiveFile(null)} className="hover:text-white">×</button></div></div>
-                                    <div className="flex-1 relative"><textarea value={fileContent} onChange={e => setFileContent(e.target.value)} className="w-full h-full bg-[#0d1117] text-slate-300 font-mono text-sm p-4 outline-none resize-none" spellCheck={false} /><button onClick={() => props.onCode(selectedLanguage)} className="absolute bottom-4 right-4 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-full shadow-lg font-bold text-xs transition-all hover:scale-105 z-10">RUN CODE</button></div>
+                                    <div className="flex-1 relative pb-6">
+                                        <CodeEditor 
+                                            value={fileContent} 
+                                            onChange={setFileContent} 
+                                            language={selectedLanguage}
+                                            onRun={() => props.onCode(selectedLanguage)}
+                                            showLineNumbers={true}
+                                        />
+                                    </div>
                                 </>
                             ) : (
                                 <Monitor codeLines={props.writtenCode} onClick={() => props.onCode(selectedLanguage)} isCrunchMode={props.isCrunchMode} onConsoleSubmit={props.onConsoleSubmit} currentTaskHint={undefined} isWindowed={true} language={selectedLanguage} />
@@ -828,7 +1045,12 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                         </div>
                         <div className="flex-1 overflow-hidden relative">
                             {builderMode === 'CODE' ? (
-                                <textarea value={builderCode} onChange={e => setBuilderCode(e.target.value)} className="w-full h-full bg-[#1e1e1e] text-slate-300 font-mono text-sm p-4 outline-none resize-none" spellCheck={false} />
+                                <CodeEditor 
+                                    value={builderCode} 
+                                    onChange={setBuilderCode} 
+                                    language={selectedLanguage}
+                                    showLineNumbers={true}
+                                />
                             ) : (
                                 <div className="relative h-full">
                                     <VisualEditor nodes={graphNodes} connections={graphConnections} onChange={(n, c) => { setGraphNodes(n); setGraphConnections(c); }} language={selectedLanguage} />
@@ -892,7 +1114,16 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                 </div>
                 <div className="flex-1 overflow-hidden">
                     <CorporationsApp 
-                        corporationReps={props.state.corporationReps} 
+                        corporationReps={props.state.corporationReps}
+                        membership={props.state.corpMembership}
+                        activeQuests={props.state.activeCorpQuests}
+                        completedQuestIds={props.state.completedCorpQuests}
+                        money={props.state.money}
+                        onJoinCorp={props.onJoinCorp}
+                        onLeaveCorp={props.onLeaveCorp}
+                        onStartQuest={props.onStartQuest}
+                        onCollectReward={props.onCollectReward}
+                        onPayDues={props.onPayDues}
                         onSelectCorporation={(corpId) => console.log('Selected corporation:', corpId)} 
                     />
                 </div>
@@ -911,7 +1142,49 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                     <BlueprintsApp 
                         blueprints={props.state.blueprints || []}
                         money={props.state.money}
+                        shadowCredits={props.state.shadowCredits}
+                        playerLevel={props.state.level}
                         onAddBlueprint={props.onAddBlueprint}
+                        onCraft={props.onCraftBlueprint}
+                        onSell={props.onSellBlueprint}
+                        onSpendMoney={props.onSpendMoney}
+                        onSpendShadowCredits={props.onSpendShadowCredits}
+                    />
+                </div>
+            </div>
+        )}
+        {activeApp === 'tutorial' && !minimized.includes('tutorial') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-cyan-900">
+                <div className="h-8 bg-black/80 border-b border-cyan-900/50 flex items-center justify-between px-3">
+                    <span className="text-xs font-bold text-cyan-400">📖 Гайд DevOS</span>
+                    <div className="flex gap-2">
+                        <button onClick={() => setMinimized(p => [...p, 'tutorial'])} className="w-3 h-3 rounded-full bg-yellow-500"></button>
+                        <button onClick={() => toggleApp('tutorial')} className="w-3 h-3 rounded-full bg-red-500"></button>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <TutorialGuide language={props.state.language} />
+                </div>
+            </div>
+        )}
+        {/* LAYER 10-12: Social Hub - P2P Contracts & Guilds */}
+        {activeApp === 'social' && !minimized.includes('social') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-purple-900">
+                <div className="h-8 bg-black/80 border-b border-purple-900/50 flex items-center justify-between px-3">
+                    <span className="text-xs font-bold text-purple-400">🌐 Social Hub</span>
+                    <div className="flex gap-2">
+                        <button onClick={() => setMinimized(p => [...p, 'social'])} className="w-3 h-3 rounded-full bg-yellow-500"></button>
+                        <button onClick={() => toggleApp('social')} className="w-3 h-3 rounded-full bg-red-500"></button>
+                    </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <SocialHub
+                        onClose={() => toggleApp('social')}
+                        playerId={props.state.username}
+                        playerName={props.state.username}
+                        playerLevel={props.state.level}
+                        playerReputation={props.state.reputation || 0}
+                        playerMoney={props.state.money}
                     />
                 </div>
             </div>
@@ -951,6 +1224,18 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                   className="w-full text-left px-2 py-2 hover:bg-slate-700 rounded text-sm text-white flex items-center gap-2 cursor-pointer"
               >
                   💾 DevFS
+              </div>
+              <div 
+                  onClick={() => { toggleApp('social'); setStartMenuOpen(false); }} 
+                  className="w-full text-left px-2 py-2 hover:bg-slate-700 rounded text-sm text-white flex items-center gap-2 cursor-pointer"
+              >
+                  👥 SocialHub
+              </div>
+              <div 
+                  onClick={() => { toggleApp('corporations'); setStartMenuOpen(false); }} 
+                  className="w-full text-left px-2 py-2 hover:bg-slate-700 rounded text-sm text-white flex items-center gap-2 cursor-pointer"
+              >
+                  🏢 Corporations
               </div>
               <div className="h-px bg-slate-700 my-2"></div>
               <div 

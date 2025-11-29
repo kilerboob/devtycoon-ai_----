@@ -35,14 +35,14 @@ import {
 interface CorporationsAppProps {
   corporationReps: CorporationReputation[];
   membership?: CorpMembership;
-  activeQuests?: CorpQuest[];
-  completedQuestIds?: string[];
-  money?: number;
-  onJoinCorp?: (corpId: CorporationId) => void;
-  onLeaveCorp?: () => void;
-  onStartQuest?: (quest: CorpQuest) => void;
-  onCollectReward?: (quest: CorpQuest) => void;
-  onPayDues?: () => void;
+  activeQuests: CorpQuest[];
+  completedQuestIds: string[];
+  money: number;
+  onJoinCorp: (corpId: CorporationId) => void;
+  onLeaveCorp: () => void;
+  onStartQuest: (quest: CorpQuest) => void;
+  onCollectReward: (quest: CorpQuest) => void;
+  onPayDues: () => void;
   onSelectCorporation?: (corpId: CorporationId) => void;
 }
 
@@ -84,12 +84,12 @@ export const CorporationsApp: React.FC<CorporationsAppProps> = ({
   membership,
   activeQuests = [],
   completedQuestIds = [],
-  money = 0,
-  onJoinCorp = () => {},
-  onLeaveCorp = () => {},
-  onStartQuest = () => {},
-  onCollectReward = () => {},
-  onPayDues = () => {},
+  money,
+  onJoinCorp,
+  onLeaveCorp,
+  onStartQuest,
+  onCollectReward,
+  onPayDues,
   onSelectCorporation
 }) => {
   const [selectedCorpId, setSelectedCorpId] = useState<CorporationId | null>(
