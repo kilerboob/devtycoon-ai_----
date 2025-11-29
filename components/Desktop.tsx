@@ -21,6 +21,7 @@ import { BlueprintsApp } from './BlueprintsApp';
 import { TutorialGuide } from './TutorialGuide';
 import { CodeEditor } from './CodeEditor';
 import { SocialHub } from './SocialHub';
+import { LabsApp } from './LabsApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -287,6 +288,8 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'corporations', type: 'app', title: 'Corps', icon: '🏢', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H, appId: 'corporations' },
     // Social Hub (LAYER 10-12: P2P Contracts & Guilds)
     { id: 'social', type: 'app', title: 'SocialHub', icon: '👥', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'social' },
+    // Labs Network (LAYER 6: Independent Labs, hacking, prototypes)
+    { id: 'labs', type: 'app', title: 'Labs', icon: '🔬', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 3, appId: 'labs' },
     // Tutorial Guide App - Help system with all features walkthrough
     { id: 'tutorial', type: 'app', title: 'Гайд', icon: '📖', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'tutorial' },
     // System folder shortcuts - open StorageApp with initial path
@@ -757,8 +760,11 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
               return { ...item, x: MARGIN_X + col * GRID_W, y: MARGIN_Y + row * GRID_H };
           });
           setDesktopItems(arranged);
+      } else if (action === 'hide_icon' && contextMenu?.targetId) {
+          // Remove icon from desktop but keep the app installed
+          setDesktopItems(prev => prev.filter(i => i.id !== contextMenu.targetId));
       } else if (action === 'delete' && contextMenu?.targetId) {
-          // Only delete user apps or empty folders
+          // Full uninstall: remove from desktop AND delete user app
           setDesktopItems(prev => prev.filter(i => i.id !== contextMenu.targetId));
           const app = props.state.userApps.find(a => a.id === contextMenu.targetId);
           if (app) props.onUninstallApp(app.id);
@@ -795,10 +801,11 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
       
       return (
         <div 
-            key={item.id} 
+            key={item.id}
+            data-desktop-icon="true"
             onMouseDown={(e) => onMouseDownIcon(e, item)}
             onDoubleClick={handleDoubleClick}
-            onContextMenu={(e) => handleRightClick(e, item.id)}
+            onContextMenu={(e) => { e.stopPropagation(); e.preventDefault(); handleRightClick(e, item.id); }}
             className={`absolute flex flex-col items-center gap-1 group cursor-pointer p-1 rounded transition-all select-none 
                 ${isDragging ? 'z-50 scale-110' : 'transition-transform hover:bg-white/10'}
                 ${iconSize === 'medium' ? 'w-[80px]' : 'w-[60px]'}
@@ -841,8 +848,17 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
     >
     <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] pointer-events-none"></div>
       
-      {/* Desktop Area */}
-      <div className="flex-1 relative overflow-hidden">
+      {/* Desktop Area - clickable for context menu */}
+      <div 
+          className="flex-1 relative overflow-hidden"
+          onContextMenu={(e) => {
+              // Only show desktop menu if clicking on empty space (not on icon)
+              const target = e.target as HTMLElement;
+              if (!target.closest('[data-desktop-icon]')) {
+                  handleRightClick(e);
+              }
+          }}
+      >
           {desktopItems.map(renderIcon)}
           
           {/* Open Folders */}
@@ -873,25 +889,32 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                     const isSystemApp = SYSTEM_APPS.some(s => s.id === contextMenu.targetId);
                     const isUserApp = props.state.userApps.some(a => a.id === contextMenu.targetId);
                     const isUserFolder = targetItem?.type === 'folder' && !targetItem.id.startsWith('folder-');
-                    // Can delete: user apps, user-created folders (not system folders)
-                    const canDelete = isUserApp || isUserFolder;
+                    const isSystemFolder = targetItem?.type === 'folder' && targetItem.id.startsWith('folder-');
                     return (
                       <>
                         <button onClick={() => toggleApp(targetItem?.appId || '')} className="w-full text-left px-3 py-1.5 hover:bg-blue-600 text-white flex items-center gap-2">
-                          <span>🔓</span> Open
+                          <span>🔓</span> Открыть
                         </button>
                         {targetItem && (
                           <div className="px-3 py-1 text-slate-500 text-xs border-t border-slate-700 mt-1">
-                            {targetItem.title} {isUserApp ? '(User App)' : isSystemApp ? '(System)' : ''}
+                            {targetItem.title} {isUserApp ? '(Мой)' : isSystemApp ? '(Система)' : ''}
                           </div>
                         )}
-                        {canDelete && (
-                          <button onClick={() => handleContextMenuAction('delete')} className="w-full text-left px-3 py-1.5 hover:bg-red-600 text-red-300 flex items-center gap-2">
-                            <span>🗑️</span> Uninstall
+                        {/* Remove from desktop - for system apps (hides icon, app stays in Start Menu) */}
+                        {isSystemApp && (
+                          <button onClick={() => handleContextMenuAction('hide_icon')} className="w-full text-left px-3 py-1.5 hover:bg-orange-600 text-orange-300 flex items-center gap-2">
+                            <span>👁️‍🗨️</span> Убрать с рабочего стола
                           </button>
                         )}
-                        {isSystemApp && !isUserApp && (
-                          <div className="px-3 py-1 text-slate-500 text-xs italic">Protected system app</div>
+                        {/* Full delete for user apps and user folders */}
+                        {(isUserApp || isUserFolder) && (
+                          <button onClick={() => handleContextMenuAction('delete')} className="w-full text-left px-3 py-1.5 hover:bg-red-600 text-red-300 flex items-center gap-2">
+                            <span>🗑️</span> Удалить
+                          </button>
+                        )}
+                        {/* System folders can't be removed */}
+                        {isSystemFolder && (
+                          <div className="px-3 py-1 text-slate-500 text-xs italic">Системная папка</div>
                         )}
                       </>
                     );
@@ -1189,6 +1212,20 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                 </div>
             </div>
         )}
+        {/* LAYER 6: Labs Network - Independent Labs, Hacking, Prototypes */}
+        {activeApp === 'labs' && !minimized.includes('labs') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-cyan-900">
+                <LabsApp
+                    state={props.state}
+                    onStartHack={(labId, questId) => {
+                        // Trigger hacking minigame with lab context
+                        if (props.onStartHack) props.onStartHack();
+                        console.log('[Labs] Starting hack on lab:', labId, 'quest:', questId);
+                    }}
+                    onClose={() => toggleApp('labs')}
+                />
+            </div>
+        )}
         {activeApp === 'settings' && !minimized.includes('settings') && (
             <SettingsApp 
                 onClose={() => toggleApp('settings')} 
@@ -1236,6 +1273,12 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                   className="w-full text-left px-2 py-2 hover:bg-slate-700 rounded text-sm text-white flex items-center gap-2 cursor-pointer"
               >
                   🏢 Corporations
+              </div>
+              <div 
+                  onClick={() => { toggleApp('labs'); setStartMenuOpen(false); }} 
+                  className="w-full text-left px-2 py-2 hover:bg-slate-700 rounded text-sm text-white flex items-center gap-2 cursor-pointer"
+              >
+                  🔬 Labs Network
               </div>
               <div className="h-px bg-slate-700 my-2"></div>
               <div 
