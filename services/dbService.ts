@@ -3,7 +3,7 @@ import { INITIAL_GAME_STATE } from '../constants';
 
 const DB_NAME = 'DevTycoonDB_v1';
 const STORE_NAME = 'gameState';
-const DB_VERSION = 4; // Bump: add devFS_versions store for file version history
+const DB_VERSION = 5; // Bump: add shards store for LAYER 4
 
 class DBService {
   private db: IDBDatabase | null = null;
@@ -77,6 +77,11 @@ class DBService {
         const verStore = db.createObjectStore('devFS_versions', { keyPath: 'id' });
         try { verStore.createIndex('byFile', 'filePath', { unique: false }); } catch {}
         try { verStore.createIndex('byFileTime', ['filePath', 'timestamp'], { unique: false }); } catch {}
+
+        // LAYER 4: Shards store for server selection
+        if (!db.objectStoreNames.contains('shards')) {
+          db.createObjectStore('shards', { keyPath: 'id' });
+        }
       };
 
       // If another tab holds the DB open at an older version, this upgrade may be blocked

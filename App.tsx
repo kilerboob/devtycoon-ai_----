@@ -8,11 +8,13 @@ import { StoryModal } from './components/StoryModal';
 import { PCInternals } from './components/PCInternals';
 import { AuthScreen } from './components/AuthScreen';
 import { HackingMinigame } from './components/HackingMinigame';
+import { ShardSelector } from './components/ShardSelector';
 import { playSound } from './utils/sound';
 import { dbService } from './services/dbService';
 import { devFsService, FSWatcherCallback } from './services/devFsService';
 import migrateEnsureIds from './services/devFsMigration';
 import { onlineService } from './services/onlineMock';
+import { shardService } from './services/shardService';
 import { MatrixBackground } from './components/MatrixBackground';
 import { EndingScreen } from './components/EndingScreen';
 import { NotificationContainer } from './components/NotificationContainer';
@@ -78,6 +80,7 @@ export default function App() {
     const [isLoading, setIsLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [hasSave, setHasSave] = useState(false);
+    const [hasSelectedShard, setHasSelectedShard] = useState(false);
 
     const [view, setView] = useState<'ROOM' | 'DESKTOP'>('ROOM');
     const [isPCBuildMode, setIsPCBuildMode] = useState(false);
@@ -284,6 +287,7 @@ export default function App() {
                 // Init DB and DevFS
                 await dbService.init();
                 await devFsService.init();
+                await shardService.init();
 
                 // Run one-time migration to ensure existing devFS entries have ids
                 try {
@@ -298,6 +302,10 @@ export default function App() {
 
                 const exists = await dbService.hasSave();
                 setHasSave(exists);
+                
+                // Check if shard is already selected
+                const hasShard = shardService.hasSelectedShard();
+                setHasSelectedShard(hasShard);
             } catch (error) {
                 console.error("Initialization failed", error);
                 addLog("Ошибка инициализации базы данных.", "error");
@@ -1616,6 +1624,31 @@ export default function App() {
 
     if (!isAuthenticated) {
         return <AuthScreen hasSave={hasSave} onLogin={handleLogin} onRegister={handleRegister} />;
+    }
+
+    // LAYER 4: Shard Selection - показываем после авторизации, если шард не выбран
+    if (!hasSelectedShard) {
+        const handleShardSelect = (shardId: string) => {
+            setHasSelectedShard(true);
+            const shard = shardService.getShard(shardId);
+            if (shard) {
+                addNotification(
+                    '🌐 Подключено к серверу',
+                    `${shard.name} (${shard.region})`,
+                    'success',
+                    '🚀',
+                    5000
+                );
+                addLog(`Подключение к серверу ${shard.name} успешно.`, 'success');
+            }
+        };
+        
+        return (
+            <ShardSelector 
+                onSelect={handleShardSelect}
+                username={gameState.username}
+            />
+        );
     }
 
     const storageStats = calculateStorage();
