@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { INITIAL_GAME_STATE, CODE_SNIPPETS, LEARNING_QUESTS, HARDWARE_CATALOG, SKILL_TREE, FILE_SYSTEM_INIT, BANK_CONSTANTS, NEWS_TEMPLATES, EMAIL_TEMPLATES, ACHIEVEMENTS } from './constants';
-import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole } from './types';
+import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole, Blueprint } from './types';
 import { Room } from './components/Room';
 import { Desktop } from './components/Desktop';
 import { StoryModal } from './components/StoryModal';
@@ -792,6 +792,16 @@ export default function App() {
                 creditScore: Math.min(850, prev.creditScore + 15)
             };
         });
+    };
+
+    // LAYER 7: Add Blueprint
+    const handleAddBlueprint = (blueprint: Blueprint) => {
+        setGameState(prev => ({
+            ...prev,
+            blueprints: [...prev.blueprints, blueprint]
+        }));
+        addNotification('Новый чертёж!', `Получен: ${blueprint.name} (${blueprint.tier})`, 'success', '📜');
+        playSound('success');
     };
 
     const handleRestart = async () => {
@@ -1707,6 +1717,8 @@ export default function App() {
                     onTakeLoan={handleTakeLoan}
                     onRepayLoan={handleRepayLoan}
                     onNotify={addNotification}
+                    // LAYER 7: Blueprints
+                    onAddBlueprint={handleAddBlueprint}
                 />
             )}
 

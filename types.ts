@@ -369,7 +369,7 @@ export interface GameState {
   unlockedAchievements: string[]; // Achievement IDs
 }
 
-export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | string;
+export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | string;
 
 // LAYER 1: DevFS Types
 export interface DevFile {
