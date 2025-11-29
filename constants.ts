@@ -372,13 +372,21 @@ export const INITIAL_GAME_STATE: GameState = {
     playerTier: 'trainee',
     blueprints: [],
     corporationReps: [
+        // S-TIER (LAYER 28)
+        { corporationId: 'ang_vers', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
+        // A-TIER
         { corporationId: 'titan', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
+        { corporationId: 'orbitron', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
+        // B-TIER
         { corporationId: 'novatek', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
         { corporationId: 'cyberforge', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
-        { corporationId: 'blacksun', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
-        { corporationId: 'orbitron', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() }
+        // C-TIER (Shadow)
+        { corporationId: 'blacksun', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() }
     ],
-    serverRegion: 'EU-West' // Default region
+    serverRegion: 'EU-West', // Default region
+
+    // LAYER 28: ANG Vers Social State (initialized on first login)
+    angVersState: undefined
 };
 
 export const CODE_SNIPPETS: Record<ProgrammingLanguage, string[]> = {

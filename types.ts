@@ -367,6 +367,9 @@ export interface GameState {
   // Notification \u0026 Achievement System
   notifications: Notification[];
   unlockedAchievements: string[]; // Achievement IDs
+
+  // LAYER 28: ANG Vers Social State
+  angVersState?: ANGVersState;
 }
 
 export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'profile' | string;
@@ -404,8 +407,9 @@ export interface DevFSVersion {
 
 // ============================================
 // LAYER 5: Corporations
+// LAYER 28: ANG Vers (S-Tier)
 // ============================================
-export type CorporationId = 'titan' | 'novatek' | 'cyberforge' | 'blacksun' | 'orbitron';
+export type CorporationId = 'titan' | 'novatek' | 'cyberforge' | 'blacksun' | 'orbitron' | 'ang_vers';
 
 export interface Corporation {
   id: CorporationId;
@@ -418,6 +422,7 @@ export interface Corporation {
   ceo: string; // NPC name
   influence: number; // 0-100 global influence
   isEvil?: boolean; // For lore
+  tier?: CorporationTier; // S/A/B/C/D tier
 }
 
 export interface CorporationReputation {
@@ -504,4 +509,304 @@ export interface PlayerTierInfo {
   minReputation: number;
   benefits: string[];
   icon: string;
+}
+
+// ============================================
+// LAYER 28: ANG Vers Social Corporation
+// ============================================
+
+// Corporation Tiers (S-Class = максимальный уровень влияния)
+export type CorporationTier = 'D' | 'C' | 'B' | 'A' | 'S';
+
+// Типы социальных связей
+export type SocialConnectionType = 
+  | 'friend' 
+  | 'colleague' 
+  | 'rival' 
+  | 'enemy' 
+  | 'blocked' 
+  | 'guild_member' 
+  | 'studio_partner' 
+  | 'contractor' 
+  | 'employer';
+
+// Статус социального профиля
+export type SocialStatus = 
+  | 'active' 
+  | 'suspended' 
+  | 'banned' 
+  | 'under_investigation' 
+  | 'verified' 
+  | 'elite';
+
+// Социальный профиль игрока (управляется ANG Vers)
+export interface SocialProfile {
+  id: string;
+  username: string;
+  displayName: string;
+  avatar: string; // Emoji or URL
+  status: SocialStatus;
+  
+  // Рейтинги
+  socialRating: number; // 0-1000 (общий социальный рейтинг)
+  trustScore: number; // 0-100 (доверие системы)
+  employerRating: number; // 1-5 stars
+  freelancerRating: number; // 1-5 stars
+  
+  // Статистика
+  totalConnections: number;
+  contractsCompleted: number;
+  contractsFailed: number;
+  complaintsReceived: number;
+  complaintsResolved: number;
+  
+  // Членство
+  guildId?: string;
+  studioId?: string;
+  corporationAffiliations: string[]; // Corporation IDs
+  
+  // Безопасность
+  verificationLevel: 0 | 1 | 2 | 3; // 0=none, 3=full KYC
+  securityIncidents: number;
+  lastSecurityScan: number;
+  
+  // Метаданные
+  createdAt: number;
+  lastActiveAt: number;
+}
+
+// Социальная связь между двумя профилями
+export interface SocialConnection {
+  id: string;
+  fromProfileId: string;
+  toProfileId: string;
+  type: SocialConnectionType;
+  strength: number; // 0-100 (сила связи)
+  createdAt: number;
+  lastInteraction: number;
+  
+  // Взаимные данные
+  mutualGuilds: string[];
+  mutualFriends: number;
+  sharedContracts: number;
+}
+
+// Гильдия (управляется ANG Vers)
+export interface Guild {
+  id: string;
+  name: string;
+  tag: string; // Short tag like [ANG]
+  logo: string; // Emoji
+  type: 'hacker' | 'security' | 'trader' | 'developer' | 'engineer' | 'mixed';
+  
+  leaderId: string;
+  memberIds: string[];
+  maxMembers: number;
+  
+  // Статистика
+  reputation: number;
+  totalContracts: number;
+  successRate: number;
+  
+  // Экономика
+  treasury: number;
+  weeklyIncome: number;
+  
+  // ANG Vers License
+  license: 'basic' | 'standard' | 'premium' | 'elite';
+  licenseExpiry: number;
+  
+  createdAt: number;
+}
+
+// Студия разработки (управляется ANG Vers)
+export interface Studio {
+  id: string;
+  name: string;
+  logo: string;
+  ownerId: string;
+  memberIds: string[];
+  
+  // Специализация
+  specialization: 'games' | 'apps' | 'web' | 'ai' | 'security' | 'mixed';
+  
+  // Рейтинги
+  clientRating: number; // 1-5
+  projectsCompleted: number;
+  projectsInProgress: number;
+  
+  // Финансы
+  revenue: number;
+  expenses: number;
+  
+  // Лицензия ANG Vers
+  license: 'indie' | 'pro' | 'enterprise';
+  verified: boolean;
+  
+  createdAt: number;
+}
+
+// Контракт на социальном рынке
+export interface SocialContract {
+  id: string;
+  type: 'hire' | 'freelance' | 'collaboration' | 'guild_job' | 'studio_project';
+  
+  // Стороны
+  clientId: string;
+  contractorId?: string; // Может быть пустым если открыт
+  
+  // Детали
+  title: string;
+  description: string;
+  requirements: string[];
+  
+  // Оплата
+  payment: number;
+  paymentType: 'fixed' | 'hourly' | 'revenue_share';
+  escrowHeld: number; // Сколько заморожено в эскроу
+  
+  // Статус
+  status: 'open' | 'in_progress' | 'completed' | 'disputed' | 'cancelled';
+  
+  // Сроки
+  deadline: number;
+  createdAt: number;
+  completedAt?: number;
+  
+  // Рейтинг после завершения
+  clientRating?: number;
+  contractorRating?: number;
+}
+
+// Жалоба (обрабатывается ANG Vers)
+export interface SocialComplaint {
+  id: string;
+  complainantId: string;
+  defendantId: string;
+  
+  type: 'fraud' | 'harassment' | 'breach_of_contract' | 'theft' | 'spam' | 'other';
+  description: string;
+  evidence: string[]; // File IDs or logs
+  
+  status: 'pending' | 'investigating' | 'resolved' | 'dismissed';
+  resolution?: string;
+  penalty?: {
+    type: 'warning' | 'fine' | 'suspension' | 'ban';
+    amount?: number;
+    duration?: number; // days
+  };
+  
+  createdAt: number;
+  resolvedAt?: number;
+  arbitratorId?: string;
+}
+
+// Уведомление от ANG Vers
+export interface SystemNotification {
+  id: string;
+  recipientId: string;
+  
+  type: 'info' | 'warning' | 'alert' | 'threat' | 'government' | 'corporate';
+  priority: 'low' | 'normal' | 'high' | 'critical';
+  
+  title: string;
+  message: string;
+  
+  // Источник
+  source: 'ang_vers' | 'government' | 'corporation' | 'guild' | 'npc' | 'system';
+  sourceId?: string;
+  
+  // Действия
+  actions?: {
+    label: string;
+    action: string; // Action ID
+  }[];
+  
+  isRead: boolean;
+  createdAt: number;
+  expiresAt?: number;
+}
+
+// Социальный рынок услуг
+export interface MarketListing {
+  id: string;
+  sellerId: string;
+  
+  type: 'service' | 'product' | 'contract' | 'membership';
+  category: 'development' | 'design' | 'security' | 'hacking' | 'consulting' | 'other';
+  
+  title: string;
+  description: string;
+  
+  price: number;
+  priceType: 'fixed' | 'negotiable' | 'auction';
+  currency: 'usd' | 'shadow_credits';
+  
+  // Для услуг
+  deliveryTime?: number; // days
+  revisions?: number;
+  
+  // Статистика
+  views: number;
+  purchases: number;
+  rating: number;
+  
+  isActive: boolean;
+  isFeatured: boolean; // Продвижение через ANG Vers
+  
+  createdAt: number;
+}
+
+// Угроза от NPC (логируется ANG Vers)
+export interface ThreatLog {
+  id: string;
+  targetId: string;
+  sourceNpcId: string;
+  
+  type: 'warning' | 'threat' | 'blackmail' | 'ultimatum' | 'attack';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  
+  message: string;
+  demands?: string;
+  deadline?: number;
+  
+  status: 'active' | 'resolved' | 'escalated' | 'ignored';
+  reportedToSecurity: boolean;
+  
+  createdAt: number;
+}
+
+// Общее состояние ANG Vers для игрока
+export interface ANGVersState {
+  // Личный профиль
+  profile: SocialProfile;
+  
+  // Связи
+  connections: SocialConnection[];
+  pendingRequests: string[]; // Входящие запросы в друзья
+  
+  // Организации
+  guild?: Guild;
+  studio?: Studio;
+  
+  // Контракты
+  activeContracts: SocialContract[];
+  contractHistory: string[]; // Contract IDs
+  
+  // Жалобы
+  pendingComplaints: SocialComplaint[];
+  
+  // Уведомления
+  notifications: SystemNotification[];
+  unreadCount: number;
+  
+  // Угрозы
+  activeThreats: ThreatLog[];
+  
+  // Рыночные листинги
+  myListings: MarketListing[];
+  
+  // Социальные очки (влияние в системе)
+  socialInfluence: number; // 0-1000
+  angVersStanding: 'hostile' | 'neutral' | 'friendly' | 'partner' | 'elite';
 }
