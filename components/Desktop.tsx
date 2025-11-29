@@ -262,6 +262,10 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'skills', type: 'app', title: 'Skills', icon: '🧠', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 2, appId: 'skills' },
     { id: 'music', type: 'app', title: 'WinAmp', icon: '🎵', x: MARGIN_X + GRID_W, y: MARGIN_Y + GRID_H * 3, appId: 'music' },
     { id: 'leaderboard', type: 'app', title: 'Ranking', icon: '🏆', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y, appId: 'leaderboard' },
+    // System folder shortcuts - open StorageApp with initial path
+    { id: 'folder-projects', type: 'folder', title: 'Проекты', icon: '📂', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H, appId: 'devfs' },
+    { id: 'folder-sites', type: 'folder', title: 'Сайты', icon: '🌐', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'devfs' },
+    { id: 'folder-storage', type: 'folder', title: 'Хранилище', icon: '📦', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 3, appId: 'devfs' },
 ];
 
 export const Desktop: React.FC<DesktopProps> = (props) => {
@@ -297,6 +301,9 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
   const [dragItem, setDragItem] = useState<{id: string, startX: number, startY: number, initX: number, initY: number} | null>(null);
   const [openFolders, setOpenFolders] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<{x: number, y: number, targetId?: string} | null>(null);
+  
+  // StorageApp initial path state
+  const [storageAppPath, setStorageAppPath] = useState<string | undefined>(undefined);
 
   const t = TRANSLATIONS[props.state.language];
 
@@ -615,11 +622,32 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
 
   const renderIcon = (item: DesktopItem) => {
       const isDragging = dragItem?.id === item.id;
+      
+      const handleDoubleClick = () => {
+          if (item.type === 'folder') {
+              // Check if it's a system folder shortcut
+              if (item.id === 'folder-projects') {
+                  setStorageAppPath('/projects');
+                  toggleApp('devfs');
+              } else if (item.id === 'folder-sites') {
+                  setStorageAppPath('/sites');
+                  toggleApp('devfs');
+              } else if (item.id === 'folder-storage') {
+                  setStorageAppPath('/storage');
+                  toggleApp('devfs');
+              } else {
+                  setOpenFolders([...openFolders, item.id]);
+              }
+          } else {
+              toggleApp(item.appId!);
+          }
+      };
+      
       return (
         <div 
             key={item.id} 
             onMouseDown={(e) => onMouseDownIcon(e, item)}
-            onDoubleClick={() => item.type === 'folder' ? setOpenFolders([...openFolders, item.id]) : toggleApp(item.appId!)}
+            onDoubleClick={handleDoubleClick}
             onContextMenu={(e) => handleRightClick(e, item.id)}
             className={`absolute flex flex-col items-center gap-1 group cursor-pointer p-1 rounded transition-all select-none 
                 ${isDragging ? 'z-50 scale-110' : 'transition-transform hover:bg-white/10'}
@@ -833,7 +861,14 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
             <InventoryApp state={props.state} onClose={() => toggleApp('storage')} />
         )}
         {activeApp === 'devfs' && !minimized.includes('devfs') && (
-            <StorageApp onClose={() => toggleApp('devfs')} onNotify={props.onNotify} />
+            <StorageApp 
+                onClose={() => { 
+                    toggleApp('devfs'); 
+                    setStorageAppPath(undefined); // Reset path on close
+                }} 
+                onNotify={props.onNotify} 
+                initialPath={storageAppPath}
+            />
         )}
         {activeApp === 'bank' && !minimized.includes('bank') && (
             <BankApp state={props.state} onClose={() => toggleApp('bank')} onPayBill={props.onPayBill} onTakeLoan={props.onTakeLoan} onRepayLoan={props.onRepayLoan} />

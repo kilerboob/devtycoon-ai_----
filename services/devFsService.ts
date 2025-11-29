@@ -35,6 +35,16 @@ class DevFsService {
   await dbService.add(FS_STORE_NAME, rootFolder);
         console.info('[DevFsService:init] created root folder');
       }
+      
+      // Create default system folders if they don't exist
+      const systemFolders = ['/projects', '/sites', '/storage', '/apps'];
+      for (const folderPath of systemFolders) {
+        const folder = await this.getEntry(folderPath);
+        if (!folder) {
+          await this.createFolder(folderPath);
+          console.info(`[DevFsService:init] created system folder: ${folderPath}`);
+        }
+      }
     } catch (e) {
       console.error('[DevFsService:init] failed to initialize devFS', e);
       throw e;

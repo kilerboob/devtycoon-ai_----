@@ -5,6 +5,7 @@ import { devFsService, FSWatcherCallback } from '../services/devFsService';
 interface StorageAppProps {
     onClose: () => void;
     onNotify?: (title: string, message: string, type?: 'info'|'error'|'success'|'achievement', icon?: string, duration?: number) => void;
+    initialPath?: string; // Path to open on start (for Desktop icons)
 }
 
 interface TreeNode {
@@ -16,25 +17,43 @@ interface TreeNode {
     size?: number;
 }
 
-export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify }) => {
+export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify, initialPath }) => {
     const [tree, setTree] = useState<TreeNode | null>(null);
     const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set(['/']));
-    const [selectedPath, setSelectedPath] = useState('/');
+    const [selectedPath, setSelectedPath] = useState(initialPath || '/');
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('name');
     const [isRenaming, setIsRenaming] = useState(false);
+    const [renameValue, setRenameValue] = useState('');
     const [previewContent, setPreviewContent] = useState('');
     const [selectedEntryType, setSelectedEntryType] = useState<'file' | 'folder' | null>(null);
     const [versions, setVersions] = useState<Array<{ id: string; timestamp: number }>>([]);
     const [loadingVersions, setLoadingVersions] = useState(false);
     const [showVersions, setShowVersions] = useState(false);
     const [versionFlags, setVersionFlags] = useState<Record<string, number>>({}); // path -> count
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; path: string; isFolder: boolean } | null>(null);
 
     // Initialize and load tree
     useEffect(() => {
         loadTree();
     }, []);
+
+    // Expand to initialPath if provided
+    useEffect(() => {
+        if (initialPath && initialPath !== '/') {
+            // Expand all parent folders
+            const parts = initialPath.split('/').filter(Boolean);
+            const pathsToExpand = new Set<string>(['/']);
+            let current = '';
+            for (const part of parts) {
+                current += '/' + part;
+                pathsToExpand.add(current);
+            }
+            setExpandedPaths(pathsToExpand);
+            setSelectedPath(initialPath);
+        }
+    }, [initialPath, tree]);
 
     
 
@@ -478,6 +497,18 @@ export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify }) => 
         const hasChildren = node.type === 'folder' && node.children && node.children.length > 0;
         const isSelected = selectedPath === node.path;
         const verCount = node.type === 'file' ? (versionFlags[node.path] || 0) : 0;
+        const isRenamingThis = isRenaming && isSelected;
+
+        const handleContextMenu = (e: React.MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                path: node.path,
+                isFolder: node.type === 'folder'
+            });
+        };
 
         return (
             <div key={node.path}>
@@ -487,6 +518,12 @@ export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify }) => 
                     }`}
                     style={{ marginLeft: `${level * 16}px` }}
                     onClick={() => setSelectedPath(node.path)}
+                    onContextMenu={handleContextMenu}
+                    onDoubleClick={() => {
+                        if (node.type === 'folder') {
+                            toggleExpand(node.path);
+                        }
+                    }}
                 >
                     {hasChildren && (
                         <button
@@ -502,29 +539,70 @@ export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify }) => 
                     {!hasChildren && node.type === 'folder' && <span className="w-4" />}
 
                     <span className="text-lg">
-                        {node.type === 'folder' ? '📁' : '📄'}
+                        {node.type === 'folder' ? '📁' : getFileIcon(node.name)}
                     </span>
-                    <span className="text-sm text-slate-200 flex-1 truncate flex items-center gap-2">
-                        {node.name}
-                        {node.type === 'file' && verCount > 0 && (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-900/50 border border-blue-700 text-blue-200" title="Есть версии файла">
-                                🕓 {verCount}
-                            </span>
-                        )}
-                    </span>
+                    
+                    {isRenamingThis ? (
+                        <input
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    handleRenameEntry(node.path, renameValue);
+                                } else if (e.key === 'Escape') {
+                                    setIsRenaming(false);
+                                }
+                            }}
+                            onBlur={() => setIsRenaming(false)}
+                            autoFocus
+                            className="flex-1 bg-slate-700 text-white text-sm px-1 rounded border border-blue-500 outline-none"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    ) : (
+                        <span className="text-sm text-slate-200 flex-1 truncate flex items-center gap-2">
+                            {node.name}
+                            {node.type === 'file' && verCount > 0 && (
+                                <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-blue-900/50 border border-blue-700 text-blue-200" title="Есть версии файла">
+                                    🕓 {verCount}
+                                </span>
+                            )}
+                        </span>
+                    )}
                     {node.type === 'file' && <span className="text-xs text-slate-400">{formatSize(node.size)}</span>}
 
-                    {isSelected && (
+                    {isSelected && !isRenamingThis && (
                         <div className="flex gap-1">
                             <button
-                                className="text-red-400 hover:text-red-300 text-xs"
+                                className="text-blue-400 hover:text-blue-300 text-xs px-1"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRenameValue(node.name);
+                                    setIsRenaming(true);
+                                }}
+                                title="Переименовать"
+                            >
+                                ✏️
+                            </button>
+                            <button
+                                className="text-green-400 hover:text-green-300 text-xs px-1"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCopyEntry(node.path);
+                                }}
+                                title="Копировать"
+                            >
+                                📋
+                            </button>
+                            <button
+                                className="text-red-400 hover:text-red-300 text-xs px-1"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     handleDeleteEntry(node.path, node.type === 'folder');
                                 }}
                                 title="Удалить"
                             >
-                                ✕
+                                🗑️
                             </button>
                         </div>
                     )}
@@ -539,6 +617,20 @@ export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify }) => 
         );
     };
 
+    const getFileIcon = (name: string): string => {
+        const ext = name.split('.').pop()?.toLowerCase();
+        switch (ext) {
+            case 'html': return '🌐';
+            case 'css': return '🎨';
+            case 'js': case 'ts': case 'tsx': case 'jsx': return '⚡';
+            case 'json': return '📋';
+            case 'md': return '📝';
+            case 'png': case 'jpg': case 'gif': case 'svg': return '🖼️';
+            case 'mp3': case 'wav': case 'ogg': return '🎵';
+            default: return '📄';
+        }
+    };
+
     const getTotalSize = (node: TreeNode | null | undefined): number => {
         if (!node) return 0;
         if (node.type === 'file') return node.size || 0;
@@ -549,6 +641,17 @@ export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify }) => 
         if (!node) return 0;
         if (node.type === 'file') return 1;
         return (node.children || []).reduce((sum, child) => sum + getFileCount(child), 0);
+    };
+
+    const findNode = (root: TreeNode, path: string): TreeNode | null => {
+        if (root.path === path) return root;
+        if (root.type === 'folder' && root.children) {
+            for (const child of root.children) {
+                const found = findNode(child, path);
+                if (found) return found;
+            }
+        }
+        return null;
     };
 
     const filterTree = (node: TreeNode | null | undefined, query: string): TreeNode | null => {
@@ -598,8 +701,59 @@ export const StorageApp: React.FC<StorageAppProps> = ({ onClose, onNotify }) => 
     const filteredTree = filterTree(tree, searchQuery);
     const sortedFilteredTree = sortTree(filteredTree);
 
+    // Close context menu on click outside
+    useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        if (contextMenu) {
+            window.addEventListener('click', handleClick);
+            return () => window.removeEventListener('click', handleClick);
+        }
+    }, [contextMenu]);
+
     return (
         <div className="absolute top-10 left-10 right-10 bottom-10 bg-slate-900 rounded-lg shadow-2xl flex overflow-hidden border border-slate-700 animate-in fade-in zoom-in duration-300 font-sans flex-col">
+            {/* Context Menu */}
+            {contextMenu && (
+                <div
+                    className="fixed bg-slate-800 border border-slate-600 rounded shadow-xl z-[9999] py-1 min-w-[160px]"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        className="w-full px-3 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+                        onClick={() => {
+                            const entry = tree ? findNode(tree, contextMenu.path) : null;
+                            if (entry) {
+                                setRenameValue(entry.name);
+                                setSelectedPath(contextMenu.path);
+                                setIsRenaming(true);
+                            }
+                            setContextMenu(null);
+                        }}
+                    >
+                        ✏️ Переименовать
+                    </button>
+                    <button
+                        className="w-full px-3 py-1.5 text-left text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+                        onClick={() => {
+                            handleCopyEntry(contextMenu.path);
+                            setContextMenu(null);
+                        }}
+                    >
+                        📋 Копировать
+                    </button>
+                    <div className="border-t border-slate-700 my-1" />
+                    <button
+                        className="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-slate-700 flex items-center gap-2"
+                        onClick={() => {
+                            handleDeleteEntry(contextMenu.path, contextMenu.isFolder);
+                            setContextMenu(null);
+                        }}
+                    >
+                        🗑️ Удалить
+                    </button>
+                </div>
+            )}
             {/* Header */}
             <div className="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center">
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
