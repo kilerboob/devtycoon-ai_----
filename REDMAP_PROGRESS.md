@@ -219,15 +219,34 @@
 
 ---
 
-## 🎯 LAYER 5 — Corporations ❌ (0% DONE)
+## 🎯 LAYER 5 — Corporations ✅ (80% DONE)
+
+### ✅ Реализовано:
+
+1. **Corporation Service** ✅
+   - `services/corporationService.ts` - управление корпорациями
+   - TIER_MULTIPLIERS для влияния (S=2.5x, A=1.5x, B=1.0x, C=0.75x, D=0.5x)
+   - 6 корпораций (1 S-Tier, 2 A-Tier, 2 B-Tier, 1 C-Tier)
+
+2. **CorporationsApp** ✅
+   - `components/CorporationsApp.tsx` - UI приложение
+   - Отображение тиров (S/A/B/C/D) с визуальной индикацией
+   - Репутация и ранги (враг → элита)
+   - Прогресс-бары репутации
+   - Детальная информация о корпорациях
+
+3. **LAYER 28: ANG Vers S-Tier** ✅
+   - `services/angVersService.ts` - социальная инфраструктура
+   - `services/socialGraphService.ts` - социальный граф
+   - `services/socialMarketService.ts` - рынок услуг
+   - Профили, гильдии, студии, контракты, угрозы
 
 ### ❌ Не реализовано:
 
-- Корпорации (TITAN, NovaTek, CyberForge, BlackSun, Orbitron)
-- Лаборатории
+- Лаборатории корпораций
 - AI Cores
 - Blueprint Vaults
-- Репутационная система
+- Влияние репутации на геймплей
 
 ---
 
@@ -312,14 +331,15 @@
 | 2 | IDE Upgrade | 40% | 🟡 Partial |
 | 3 | DeVOS System 4.0 | 50% | 🟡 Partial |
 | 4 | Shards & Network | 0% | ❌ Not Started |
-| 5 | Corporations | 0% | ❌ Not Started |
+| 5 | Corporations | 80% | ✅ **NEW** |
 | 6 | Labs | 0% | ❌ Not Started |
 | 7 | Blueprints | 0% | ❌ Not Started |
 | 8-9 | Roles & Tiers | 30% | 🟡 Partial |
-| 10-12 | Social & Contracts | 0% | ❌ Not Started |
+| 10-12 | Social & Contracts | 50% | 🟡 **NEW** (LAYER 28) |
 | 13 | Planet Sphere | 0% | ❌ Not Started |
 | 14 | Hacking Layer | 5% | ❌ Minimal |
-| **TOTAL** | | **32%** | 🟡 **1/3 Done** |
+| 28 | ANG Vers S-Tier | 100% | ✅ **NEW** |
+| **TOTAL** | | **45%** | 🟡 **~Half Done** |
 
 ---
 
@@ -334,6 +354,7 @@
 - [x] Messenger - чат между игроками
 - [x] LeaderboardApp - рейтинги
 - [x] AchievementsApp - достижения
+- [x] CorporationsApp - корпорации с тирами (S/A/B/C/D)
 
 ### Infrastructure ✅
 - [x] Desktop - основной интерфейс

@@ -1,11 +1,20 @@
 import React, { useState } from 'react';
-import { CorporationReputation, CorporationId, Corporation } from '../types';
-import { CORPORATIONS, corporationService } from '../services/corporationService';
+import { CorporationReputation, CorporationId, Corporation, CorporationTier } from '../types';
+import { CORPORATIONS, corporationService, TIER_MULTIPLIERS } from '../services/corporationService';
 
 interface CorporationsAppProps {
   corporationReps: CorporationReputation[];
   onSelectCorporation?: (corpId: CorporationId) => void;
 }
+
+// Tier visual configuration
+const TIER_CONFIG: Record<CorporationTier, { color: string; label: string; glow: string }> = {
+  'S': { color: '#FFD700', label: 'S-TIER', glow: '0 0 20px #FFD700' },
+  'A': { color: '#C084FC', label: 'A-TIER', glow: '0 0 12px #C084FC' },
+  'B': { color: '#3B82F6', label: 'B-TIER', glow: '0 0 8px #3B82F6' },
+  'C': { color: '#22C55E', label: 'C-TIER', glow: '0 0 6px #22C55E' },
+  'D': { color: '#6B7280', label: 'D-TIER', glow: 'none' }
+};
 
 const RANK_COLORS: Record<CorporationReputation['rank'], string> = {
   'враг': '#ef4444',
@@ -52,8 +61,26 @@ export const CorporationsApp: React.FC<CorporationsAppProps> = ({
       {/* Header */}
       <div className="p-3 border-b border-green-900 bg-black/50">
         <h2 className="text-lg font-bold flex items-center gap-2">
-          🏢 Корпорации <span className="text-sm text-gray-500">({CORPORATIONS.length})</span>
+          🏢 Корпорации CyberNation <span className="text-sm text-gray-500">({CORPORATIONS.length})</span>
         </h2>
+        <div className="flex gap-2 mt-2 text-xs">
+          {(['S', 'A', 'B', 'C'] as CorporationTier[]).map(tier => {
+            const count = CORPORATIONS.filter(c => c.tier === tier).length;
+            return (
+              <span 
+                key={tier}
+                className="px-2 py-0.5 rounded"
+                style={{ 
+                  backgroundColor: TIER_CONFIG[tier].color + '20',
+                  color: TIER_CONFIG[tier].color,
+                  boxShadow: TIER_CONFIG[tier].glow
+                }}
+              >
+                {TIER_CONFIG[tier].label}: {count}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {/* Content */}
@@ -63,17 +90,32 @@ export const CorporationsApp: React.FC<CorporationsAppProps> = ({
           {CORPORATIONS.map(corp => {
             const rep = corporationReps.find(r => r.corporationId === corp.id);
             const isSelected = selectedCorpId === corp.id;
+            const tier = corp.tier || 'B'; // Default to B-tier if not set
             
             return (
               <div
                 key={corp.id}
                 onClick={() => handleSelect(corp.id)}
-                className={`p-3 rounded border cursor-pointer transition-all ${
+                className={`p-3 rounded border cursor-pointer transition-all relative ${
                   isSelected
                     ? 'border-green-500 bg-green-900/30'
                     : 'border-green-900/50 hover:border-green-700 bg-black/30'
                 }`}
+                style={{
+                  boxShadow: tier === 'S' ? TIER_CONFIG['S'].glow : undefined
+                }}
               >
+                {/* Tier Badge */}
+                <div 
+                  className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-xs font-bold"
+                  style={{ 
+                    backgroundColor: TIER_CONFIG[tier].color + '30',
+                    color: TIER_CONFIG[tier].color
+                  }}
+                >
+                  {tier}
+                </div>
+                
                 <div className="flex items-center gap-3">
                   <div 
                     className="text-3xl w-12 h-12 flex items-center justify-center rounded"
@@ -137,7 +179,20 @@ export const CorporationsApp: React.FC<CorporationsAppProps> = ({
                 >
                   {selectedCorp.name}
                 </h3>
-                <div className="text-sm text-gray-400">
+                {/* Tier Badge */}
+                {selectedCorp.tier && (
+                  <div 
+                    className="inline-block mt-2 px-3 py-1 rounded-full text-sm font-bold"
+                    style={{ 
+                      backgroundColor: TIER_CONFIG[selectedCorp.tier].color + '30',
+                      color: TIER_CONFIG[selectedCorp.tier].color,
+                      boxShadow: TIER_CONFIG[selectedCorp.tier].glow
+                    }}
+                  >
+                    {TIER_CONFIG[selectedCorp.tier].label} • ×{TIER_MULTIPLIERS[selectedCorp.tier]} влияния
+                  </div>
+                )}
+                <div className="text-sm text-gray-400 mt-2">
                   📍 {selectedCorp.headquarters}
                 </div>
               </div>
