@@ -1,19 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { playSound } from '../utils/sound';
-import { ServerRegion } from '../types';
+import { ServerRegion, PlayerRole } from '../types';
 import { networkService, Shard, NetworkStats } from '../services/networkService';
+import { playerRoleService, PLAYER_ROLES } from '../services/playerRoleService';
 
 interface AuthScreenProps {
     hasSave: boolean;
     onLogin: () => void;
-    onRegister: (username: string, region: ServerRegion) => void;
+    onRegister: (username: string, region: ServerRegion, role: PlayerRole) => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ hasSave, onLogin, onRegister }) => {
     const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(hasSave ? 'LOGIN' : 'REGISTER');
+    const [step, setStep] = useState<'credentials' | 'role'>('credentials');
     const [username, setUsername] = useState('');
     const [region, setRegion] = useState<ServerRegion>('US-East');
+    const [selectedRole, setSelectedRole] = useState<PlayerRole>('programmer');
     const [error, setError] = useState('');
     const [ping, setPing] = useState(45);
     
@@ -97,8 +100,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ hasSave, onLogin, onRegi
     const handleRegister = (e: React.FormEvent) => {
         e.preventDefault();
         if(!username.trim()) { setError('Username required'); return; }
+        
+        if (step === 'credentials') {
+            setStep('role');
+            playSound('click');
+            return;
+        }
+        
         playSound('success');
-        onRegister(username, region);
+        onRegister(username, region, selectedRole);
     };
 
     const handleLogin = () => {
@@ -220,39 +230,93 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ hasSave, onLogin, onRegi
 
                 {mode === 'REGISTER' && (
                     <form onSubmit={handleRegister} className="space-y-4 animate-in slide-in-from-left">
-                        <div>
-                            <label className="text-xs text-slate-500 uppercase font-bold ml-1">Codename</label>
-                            <input 
-                                type="text" 
-                                value={username}
-                                onChange={e => setUsername(e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white outline-none focus:border-purple-500 transition-colors"
-                                placeholder="Enter your alias..."
-                                maxLength={12}
-                            />
-                        </div>
-                        
-                        <div>
-                            <label className="text-xs text-slate-500 uppercase font-bold ml-1">Server Region</label>
-                            <select 
-                                value={region}
-                                onChange={e => setRegion(e.target.value as ServerRegion)}
-                                className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white outline-none focus:border-purple-500 transition-colors appearance-none"
-                            >
-                                <option value="US-East">US-East (Virginia)</option>
-                                <option value="EU-West">EU-West (Frankfurt)</option>
-                                <option value="Asia-Pacific">Asia-Pacific (Tokyo)</option>
-                                <option value="RU-Moscow">RU-Moscow (Datacenter)</option>
-                            </select>
-                        </div>
+                        {step === 'credentials' && (
+                            <>
+                                <div>
+                                    <label className="text-xs text-slate-500 uppercase font-bold ml-1">Codename</label>
+                                    <input 
+                                        type="text" 
+                                        value={username}
+                                        onChange={e => setUsername(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white outline-none focus:border-purple-500 transition-colors"
+                                        placeholder="Enter your alias..."
+                                        maxLength={12}
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="text-xs text-slate-500 uppercase font-bold ml-1">Server Region</label>
+                                    <select 
+                                        value={region}
+                                        onChange={e => setRegion(e.target.value as ServerRegion)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-white outline-none focus:border-purple-500 transition-colors appearance-none"
+                                    >
+                                        <option value="US-East">US-East (Virginia)</option>
+                                        <option value="EU-West">EU-West (Frankfurt)</option>
+                                        <option value="Asia-Pacific">Asia-Pacific (Tokyo)</option>
+                                        <option value="RU-Moscow">RU-Moscow (Datacenter)</option>
+                                    </select>
+                                </div>
 
-                        {error && <div className="text-red-500 text-xs">{error}</div>}
-                        <button 
-                            type="submit"
-                            className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105"
-                        >
-                            INITIALIZE IDENTITY
-                        </button>
+                                {error && <div className="text-red-500 text-xs">{error}</div>}
+                                <button 
+                                    type="submit"
+                                    className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105"
+                                >
+                                    ДАЛЕЕ: ВЫБОР РОЛИ →
+                                </button>
+                            </>
+                        )}
+
+                        {step === 'role' && (
+                            <>
+                                <div className="text-center mb-4">
+                                    <div className="text-xs text-slate-500 uppercase mb-1">ШАГ 2</div>
+                                    <div className="text-lg font-bold text-purple-400">Выбери свою роль</div>
+                                </div>
+
+                                <div className="grid gap-2 max-h-64 overflow-y-auto">
+                                    {PLAYER_ROLES.map(role => (
+                                        <div
+                                            key={role.id}
+                                            onClick={() => { setSelectedRole(role.id); playSound('click'); }}
+                                            className={`p-3 rounded cursor-pointer transition-all border ${
+                                                selectedRole === role.id 
+                                                    ? 'border-purple-500 bg-purple-600/20' 
+                                                    : 'border-slate-700 bg-slate-800/50 hover:bg-slate-700/50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <span className="text-2xl">{role.icon}</span>
+                                                <div>
+                                                    <div className="font-bold" style={{ color: role.color }}>{role.name}</div>
+                                                    <div className="text-xs text-slate-400">{role.description}</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded inline-block">
+                                                {role.bonuses[0].description}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex gap-2 mt-4">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setStep('credentials')}
+                                        className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded transition-all"
+                                    >
+                                        ← НАЗАД
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        className="flex-1 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105"
+                                    >
+                                        НАЧАТЬ ИГРУ
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </form>
                 )}
             </div>

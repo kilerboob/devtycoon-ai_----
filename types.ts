@@ -288,6 +288,16 @@ export interface GameState {
   bugs: number;
   level: SkillLevel;
 
+  // LAYER 8: Player Role & Tier
+  playerRole?: PlayerRole;
+  playerTier: PlayerTier;
+
+  // LAYER 5: Corporation Reputation
+  corporationReps: CorporationReputation[];
+
+  // LAYER 7: Blueprints owned
+  blueprints: Blueprint[];
+
   clickPower: number;
   autoCodePerSecond: number;
   bugChance: number;
@@ -390,4 +400,108 @@ export interface DevFSVersion {
   timestamp: number; // when version was captured
   content: string; // previous content snapshot
   reason?: string; // optional reason like 'update' | 'manual-rollback'
+}
+
+// ============================================
+// LAYER 5: Corporations
+// ============================================
+export type CorporationId = 'titan' | 'novatek' | 'cyberforge' | 'blacksun' | 'orbitron';
+
+export interface Corporation {
+  id: CorporationId;
+  name: string;
+  logo: string; // Emoji
+  color: string; // Brand color (hex)
+  description: string;
+  specialty: string; // What they're known for
+  headquarters: string; // Location
+  ceo: string; // NPC name
+  influence: number; // 0-100 global influence
+  isEvil?: boolean; // For lore
+}
+
+export interface CorporationReputation {
+  corporationId: CorporationId;
+  reputation: number; // -100 to +100
+  rank: 'враг' | 'нейтрал' | 'знакомый' | 'партнёр' | 'союзник' | 'элита';
+  totalContracts: number;
+  lastInteraction: number; // timestamp
+}
+
+// ============================================
+// LAYER 7: Blueprint System
+// ============================================
+export type BlueprintType = 'cpu' | 'gpu' | 'ram' | 'ssd' | 'cooler' | 'case' | 'ai-core' | 'quantum-node' | 'neural-chip';
+
+export type BlueprintTier = 'T1' | 'T2' | 'T3' | 'T4' | 'T5' | 'T6';
+
+export interface Blueprint {
+  id: string;
+  name: string;
+  type: BlueprintType;
+  tier: BlueprintTier;
+  rarity: 'common' | 'advanced' | 'rare' | 'prototype' | 'legendary' | 'experimental';
+  
+  // Source info
+  source: 'market' | 'lab' | 'crafted' | 'stolen' | 'reward';
+  corporationId?: CorporationId; // Which corp made it
+  
+  // Stats
+  stats: {
+    power: number; // Performance boost
+    efficiency: number; // Power consumption
+    durability: number; // How long it lasts
+    complexity: number; // Skill required to craft
+  };
+  
+  // Crafting requirements
+  craftingCost: {
+    money: number;
+    shadowCredits?: number;
+    materials?: string[]; // Other blueprint IDs needed
+    skillRequired: SkillLevel;
+  };
+  
+  // Market value
+  marketValue: number;
+  darkHubValue: number;
+  
+  // Metadata
+  description: string;
+  icon: string; // Emoji
+  isStolen?: boolean;
+  unlockedAt?: number; // When player got it
+}
+
+// ============================================
+// LAYER 8: Player Roles
+// ============================================
+export type PlayerRole = 'programmer' | 'engineer' | 'hacker' | 'security' | 'trader';
+
+export interface PlayerRoleInfo {
+  id: PlayerRole;
+  name: string;
+  icon: string;
+  color: string;
+  description: string;
+  bonuses: {
+    type: 'coding_speed' | 'hardware_discount' | 'hack_power' | 'defense' | 'trade_bonus';
+    value: number;
+    description: string;
+  }[];
+  startingPerks: string[]; // Skill IDs unlocked at start
+  preferredCorporations: CorporationId[];
+}
+
+// ============================================
+// LAYER 9: Player Tiers (Career)
+// ============================================
+export type PlayerTier = 'trainee' | 'junior' | 'middle' | 'senior' | 'architect';
+
+export interface PlayerTierInfo {
+  id: PlayerTier;
+  name: string;
+  minReputation: number;
+  benefits: string[];
+  icon: string;
 }

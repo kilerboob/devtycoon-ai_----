@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { INITIAL_GAME_STATE, CODE_SNIPPETS, LEARNING_QUESTS, HARDWARE_CATALOG, SKILL_TREE, FILE_SYSTEM_INIT, BANK_CONSTANTS, NEWS_TEMPLATES, EMAIL_TEMPLATES, ACHIEVEMENTS } from './constants';
-import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification } from './types';
+import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole } from './types';
 import { Room } from './components/Room';
 import { Desktop } from './components/Desktop';
 import { StoryModal } from './components/StoryModal';
@@ -413,16 +413,31 @@ export default function App() {
         setIsLoading(false);
     };
 
-    const handleRegister = async (username: string, region: ServerRegion) => {
+    const handleRegister = async (username: string, region: ServerRegion, role: PlayerRole) => {
         setIsLoading(true);
         await dbService.deleteSave(); // Wipe old save if exists
-        const newState = { ...INITIAL_GAME_STATE, username, serverRegion: region };
+        const now = Date.now();
+        const newState = { 
+            ...INITIAL_GAME_STATE, 
+            username, 
+            serverRegion: region,
+            playerRole: role,
+            playerTier: 'trainee' as const,
+            blueprints: [],
+            corporationReps: [
+                { corporationId: 'titan' as const, reputation: 0, rank: 'нейтрал' as const, totalContracts: 0, lastInteraction: now },
+                { corporationId: 'novatek' as const, reputation: 0, rank: 'нейтрал' as const, totalContracts: 0, lastInteraction: now },
+                { corporationId: 'cyberforge' as const, reputation: 0, rank: 'нейтрал' as const, totalContracts: 0, lastInteraction: now },
+                { corporationId: 'blacksun' as const, reputation: 0, rank: 'нейтрал' as const, totalContracts: 0, lastInteraction: now },
+                { corporationId: 'orbitron' as const, reputation: 0, rank: 'нейтрал' as const, totalContracts: 0, lastInteraction: now }
+            ]
+        };
         setGameState(newState);
         setIsAuthenticated(true);
         onlineService.start(handleIncomeMessage); // Start online sim
         setModalData({
             title: "Добро пожаловать в сеть",
-            content: `Привет, ${username}. Ты подключен к серверу ${region}. Твоя задача — стать легендой. Начни с простых скриптов, но помни: теневая сеть (DarkHub) следит за тобой.`,
+            content: `Привет, ${username}. Ты подключен к серверу ${region}. Твоя роль — ${role}. Твоя задача — стать легендой. Начни с простых скриптов, но помни: теневая сеть (DarkHub) следит за тобой.`,
             type: 'intro'
         });
         setIsLoading(false);

@@ -365,7 +365,20 @@ export const INITIAL_GAME_STATE: GameState = {
 
     // Notification & Achievement System
     notifications: [],
-    unlockedAchievements: []
+    unlockedAchievements: [],
+
+    // LAYER 5/7/8: Player Role, Blueprints, Corporations
+    playerRole: 'programmer',
+    playerTier: 'trainee',
+    blueprints: [],
+    corporationReps: [
+        { corporationId: 'titan', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
+        { corporationId: 'novatek', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
+        { corporationId: 'cyberforge', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
+        { corporationId: 'blacksun', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() },
+        { corporationId: 'orbitron', reputation: 0, rank: 'нейтрал', totalContracts: 0, lastInteraction: Date.now() }
+    ],
+    serverRegion: 'EU-West' // Default region
 };
 
 export const CODE_SNIPPETS: Record<ProgrammingLanguage, string[]> = {
