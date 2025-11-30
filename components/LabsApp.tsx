@@ -6,7 +6,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { labService, IndependentLab, LabQuest, LabType, Prototype } from '../services/labService';
-import { GameState } from '../types';
+import { GameState, HackerRank } from '../types';
 
 interface LabsAppProps {
     state: GameState;
@@ -14,7 +14,7 @@ interface LabsAppProps {
     onClose: () => void;
 }
 
-type TabType = 'labs' | 'quests' | 'prototypes' | 'map';
+type TabType = 'labs' | 'quests' | 'prototypes' | 'map' | 'stats';
 
 export const LabsApp: React.FC<LabsAppProps> = ({ state, onStartHack, onClose }) => {
     const [activeTab, setActiveTab] = useState<TabType>('labs');
@@ -422,6 +422,139 @@ export const LabsApp: React.FC<LabsAppProps> = ({ state, onStartHack, onClose })
         </div>
     );
 
+    // LAYER 14: Hacker Stats Tab
+    const renderStatsTab = () => {
+        const stats = state.hackerStats || {
+            totalHacks: 0,
+            successfulHacks: 0,
+            failedHacks: 0,
+            highestDifficulty: 0,
+            consecutiveWins: 0,
+            maxStreak: 0,
+            totalShadowCreditsEarned: 0,
+            hackerRank: 'script_kiddie' as HackerRank,
+            specializations: []
+        };
+
+        const successRate = stats.totalHacks > 0 
+            ? Math.round((stats.successfulHacks / stats.totalHacks) * 100) 
+            : 0;
+
+        const rankInfo: Record<HackerRank, { name: string; icon: string; color: string }> = {
+            'script_kiddie': { name: 'Скрипт-кидди', icon: '👶', color: 'text-gray-400' },
+            'amateur': { name: 'Любитель', icon: '🔰', color: 'text-green-400' },
+            'hacker': { name: 'Хакер', icon: '💻', color: 'text-blue-400' },
+            'elite_hacker': { name: 'Элитный хакер', icon: '⚡', color: 'text-purple-400' },
+            'cyber_ninja': { name: 'Кибер-ниндзя', icon: '🥷', color: 'text-red-400' },
+            'ghost': { name: 'Призрак', icon: '👻', color: 'text-cyan-400' },
+            'legend': { name: 'Легенда', icon: '👑', color: 'text-yellow-400' }
+        };
+
+        const currentRank = rankInfo[stats.hackerRank];
+
+        return (
+            <div className="flex-1 overflow-y-auto p-4">
+                {/* Rank Card */}
+                <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg p-6 mb-4 border border-slate-600">
+                    <div className="flex items-center gap-4 mb-4">
+                        <span className="text-5xl">{currentRank.icon}</span>
+                        <div>
+                            <div className={`text-2xl font-bold ${currentRank.color}`}>
+                                {currentRank.name}
+                            </div>
+                            <div className="text-slate-400 text-sm">Ваш хакерский ранг</div>
+                        </div>
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-green-400">{stats.successfulHacks}</div>
+                            <div className="text-xs text-slate-400">Успешных взломов</div>
+                        </div>
+                        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-red-400">{stats.failedHacks}</div>
+                            <div className="text-xs text-slate-400">Провалов</div>
+                        </div>
+                        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-cyan-400">{successRate}%</div>
+                            <div className="text-xs text-slate-400">Успешность</div>
+                        </div>
+                        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                            <div className="text-2xl font-bold text-purple-400">{stats.highestDifficulty}</div>
+                            <div className="text-xs text-slate-400">Макс. сложность</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Streaks & Earnings */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">🔥</span>
+                            <span className="text-white font-semibold">Серия побед</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <div>
+                                <div className="text-orange-400 text-xl font-bold">{stats.consecutiveWins}</div>
+                                <div className="text-xs text-slate-400">Текущая</div>
+                            </div>
+                            <div>
+                                <div className="text-yellow-400 text-xl font-bold">{stats.maxStreak}</div>
+                                <div className="text-xs text-slate-400">Лучшая</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-lg">💀</span>
+                            <span className="text-white font-semibold">Shadow Credits</span>
+                        </div>
+                        <div className="text-purple-400 text-2xl font-bold">
+                            {stats.totalShadowCreditsEarned.toLocaleString()} SC
+                        </div>
+                        <div className="text-xs text-slate-400">Всего заработано</div>
+                    </div>
+                </div>
+
+                {/* Specializations */}
+                {stats.specializations && stats.specializations.length > 0 && (
+                    <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                        <h3 className="text-white font-semibold mb-3">🎯 Специализации</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {stats.specializations.map((spec, i) => (
+                                <span key={i} className="px-2 py-1 bg-cyan-600/30 text-cyan-400 text-sm rounded">
+                                    {spec}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Rank Progress */}
+                <div className="mt-4 bg-slate-800 rounded-lg p-4 border border-slate-700">
+                    <h3 className="text-white font-semibold mb-3">📈 Прогресс рангов</h3>
+                    <div className="space-y-2">
+                        {Object.entries(rankInfo).map(([rank, info]) => {
+                            const isCurrentOrPast = Object.keys(rankInfo).indexOf(stats.hackerRank) >= Object.keys(rankInfo).indexOf(rank);
+                            return (
+                                <div key={rank} className={`flex items-center gap-2 ${isCurrentOrPast ? '' : 'opacity-40'}`}>
+                                    <span className="text-lg">{info.icon}</span>
+                                    <span className={`text-sm ${stats.hackerRank === rank ? info.color + ' font-bold' : 'text-slate-400'}`}>
+                                        {info.name}
+                                    </span>
+                                    {stats.hackerRank === rank && (
+                                        <span className="text-xs text-cyan-400 ml-auto">← Текущий</span>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderMapTab = () => (
         <div className="flex-1 overflow-hidden p-4">
             <h2 className="text-lg font-bold text-white mb-4">🗺️ Карта лабораторий</h2>
@@ -494,7 +627,7 @@ export const LabsApp: React.FC<LabsAppProps> = ({ state, onStartHack, onClose })
 
             {/* Tabs */}
             <div className="flex border-b border-slate-700 bg-slate-800/50">
-                {(['labs', 'quests', 'prototypes', 'map'] as TabType[]).map(tab => (
+                {(['labs', 'quests', 'prototypes', 'map', 'stats'] as TabType[]).map(tab => (
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -508,6 +641,7 @@ export const LabsApp: React.FC<LabsAppProps> = ({ state, onStartHack, onClose })
                         {tab === 'quests' && '📋 Квесты'}
                         {tab === 'prototypes' && '🔧 Прототипы'}
                         {tab === 'map' && '🗺️ Карта'}
+                        {tab === 'stats' && '📊 Репутация'}
                     </button>
                 ))}
             </div>
@@ -556,6 +690,7 @@ export const LabsApp: React.FC<LabsAppProps> = ({ state, onStartHack, onClose })
             {activeTab === 'quests' && renderQuestsTab()}
             {activeTab === 'prototypes' && renderPrototypesTab()}
             {activeTab === 'map' && renderMapTab()}
+            {activeTab === 'stats' && renderStatsTab()}
         </div>
     );
 };

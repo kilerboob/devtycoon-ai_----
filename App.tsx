@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { INITIAL_GAME_STATE, CODE_SNIPPETS, LEARNING_QUESTS, HARDWARE_CATALOG, SKILL_TREE, FILE_SYSTEM_INIT, BANK_CONSTANTS, NEWS_TEMPLATES, EMAIL_TEMPLATES, ACHIEVEMENTS } from './constants';
-import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole, Blueprint, CorporationId, CorpMembership, CorpQuest, DesktopItem } from './types';
+import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole, Blueprint, CorporationId, CorpMembership, CorpQuest, DesktopItem, HackerStats, HackerRank } from './types';
 import { Room } from './components/Room';
 import { Desktop } from './components/Desktop';
 import { StoryModal } from './components/StoryModal';
@@ -89,8 +89,8 @@ export default function App() {
     const [isPCBuildMode, setIsPCBuildMode] = useState(false);
     const [isJournalOpen, setIsJournalOpen] = useState(false);
     const [isHacking, setIsHacking] = useState(false);
-    // LAYER 6: Labs hacking context
-    const [hackingContext, setHackingContext] = useState<{ labId?: string; questId?: string } | null>(null);
+    // LAYER 6: Labs hacking context with difficulty
+    const [hackingContext, setHackingContext] = useState<{ labId?: string; questId?: string; difficulty?: number } | null>(null);
     const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
     const [logs, setLogs] = useState<LogEntry[]>([]);
 
@@ -127,6 +127,51 @@ export default function App() {
     const calculateUpdatedTier = useCallback((reputation: number) => {
         return playerRoleService.calculateTier(reputation);
     }, []);
+
+    // LAYER 14: Calculate hacker rank based on stats
+    const calculateHackerRank = useCallback((stats: HackerStats): HackerRank => {
+        const successRate = stats.totalHacks > 0 ? stats.successfulHacks / stats.totalHacks : 0;
+        
+        if (stats.successfulHacks >= 100 && successRate >= 0.8) return 'legend';
+        if (stats.successfulHacks >= 75) return 'ghost';
+        if (stats.successfulHacks >= 50) return 'cyber_ninja';
+        if (stats.successfulHacks >= 30) return 'elite_hacker';
+        if (stats.successfulHacks >= 15) return 'hacker';
+        if (stats.successfulHacks >= 5) return 'amateur';
+        return 'script_kiddie';
+    }, []);
+
+    // LAYER 14: Update hacker stats after hack attempt
+    const updateHackerStats = useCallback((success: boolean, difficulty: number, scEarned: number = 0): HackerStats => {
+        const currentStats = stateRef.current.hackerStats || {
+            totalHacks: 0,
+            successfulHacks: 0,
+            failedHacks: 0,
+            highestDifficulty: 0,
+            consecutiveWins: 0,
+            maxStreak: 0,
+            totalShadowCreditsEarned: 0,
+            hackerRank: 'script_kiddie' as HackerRank,
+            specializations: []
+        };
+
+        const newStats: HackerStats = {
+            ...currentStats,
+            totalHacks: currentStats.totalHacks + 1,
+            successfulHacks: success ? currentStats.successfulHacks + 1 : currentStats.successfulHacks,
+            failedHacks: success ? currentStats.failedHacks : currentStats.failedHacks + 1,
+            highestDifficulty: success ? Math.max(currentStats.highestDifficulty, difficulty) : currentStats.highestDifficulty,
+            consecutiveWins: success ? currentStats.consecutiveWins + 1 : 0,
+            maxStreak: success ? Math.max(currentStats.maxStreak, currentStats.consecutiveWins + 1) : currentStats.maxStreak,
+            totalShadowCreditsEarned: currentStats.totalShadowCreditsEarned + scEarned,
+            hackerRank: currentStats.hackerRank,
+            specializations: currentStats.specializations
+        };
+
+        newStats.hackerRank = calculateHackerRank(newStats);
+
+        return newStats;
+    }, [calculateHackerRank]);
     
     const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
         setLogs(prev => [...prev.slice(-49), {
@@ -1182,7 +1227,8 @@ export default function App() {
                         reputation: newRep,
                         playerTier: calculateUpdatedTier(newRep),
                         labsState,
-                        collectedPrototypes: newPrototypes
+                        collectedPrototypes: newPrototypes,
+                        hackerStats: updateHackerStats(true, hackingContext?.difficulty || 1, rewards.shadowCredits)
                     };
                 });
                 
@@ -1206,7 +1252,8 @@ export default function App() {
                         ...prev,
                         shadowCredits: prev.shadowCredits + 50,
                         reputation: prev.reputation + 25,
-                        labsState
+                        labsState,
+                        hackerStats: updateHackerStats(true, hackingContext?.difficulty || 1, 50)
                     };
                 });
                 addLog(`Лаборатория взломана! +50 SC, +25 репутации`, 'success');
@@ -1227,7 +1274,8 @@ export default function App() {
                 reputation: newRep,
                 playerTier: calculateUpdatedTier(newRep),
                 currentQuestIndex: prev.currentQuestIndex + 1,
-                signalEndTime: 0 // Clear signal
+                signalEndTime: 0, // Clear signal
+                hackerStats: updateHackerStats(true, hackingContext?.difficulty || 1, 0)
             };
         });
         setModalData({
@@ -1246,7 +1294,8 @@ export default function App() {
             setGameState(prev => ({
                 ...prev,
                 tracePercent: Math.min(100, prev.tracePercent + 15),
-                globalHeat: Math.min(100, prev.globalHeat + 5)
+                globalHeat: Math.min(100, prev.globalHeat + 5),
+                hackerStats: updateHackerStats(false, hackingContext?.difficulty || 1, 0)
             }));
             addLog("Взлом лаборатории провален! Уровень угрозы повышен.", "error");
             setHackingContext(null);
@@ -1257,18 +1306,35 @@ export default function App() {
             ...prev,
             tracePercent: Math.min(100, prev.tracePercent + 20),
             globalHeat: Math.min(100, prev.globalHeat + 10),
-            signalEndTime: 0 // Lose signal
+            signalEndTime: 0, // Lose signal
+            hackerStats: updateHackerStats(false, hackingContext?.difficulty || 1, 0)
         }));
         addLog("Взлом не удался. Сигнал потерян. Уровень угрозы повышен!", "error");
     };
 
-    // LAYER 6: Updated hack start to accept lab context
+    // LAYER 6: Updated hack start to accept lab context + LAYER 14: Difficulty
     const handleHackStart = (labId?: string, questId?: string) => {
+        let difficulty = 1;
+        
         if (labId) {
-            setHackingContext({ labId, questId });
-            addLog(`INITIATING BREACH PROTOCOL: ${labId}...`, "warn");
+            // Get difficulty from quest or lab tier
+            if (questId) {
+                const quest = labService.getQuests().find(q => q.id === questId);
+                if (quest) {
+                    difficulty = quest.difficulty || 3;
+                }
+            } else {
+                const lab = labService.getLab(labId);
+                if (lab) {
+                    difficulty = lab.tier; // Lab tier 1-5
+                }
+            }
+            
+            setHackingContext({ labId, questId, difficulty });
+            addLog(`INITIATING BREACH PROTOCOL: ${labId} [DIFFICULTY: ${difficulty}]...`, "warn");
         } else {
-            setHackingContext(null);
+            // Default DarkHub hack - medium difficulty
+            setHackingContext({ difficulty: 3 });
             addLog("INITIATING BREACH PROTOCOL...", "warn");
         }
         setIsHacking(true);
@@ -2060,6 +2126,7 @@ export default function App() {
                 <HackingMinigame
                     onSuccess={handleHackSuccess}
                     onFail={handleHackFail}
+                    difficulty={hackingContext?.difficulty || 1}
                 />
             )}
 

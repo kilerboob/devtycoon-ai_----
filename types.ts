@@ -291,6 +291,27 @@ export interface Achievement {
   hidden?: boolean; // Don't show until unlocked
 }
 
+// LAYER 14: Hacker Reputation System
+export interface HackerStats {
+  totalHacks: number;           // Total hack attempts
+  successfulHacks: number;      // Successful hacks
+  failedHacks: number;          // Failed hacks
+  highestDifficulty: number;    // Max difficulty beaten (1-10)
+  consecutiveWins: number;      // Current streak
+  maxStreak: number;            // Best streak ever
+  totalShadowCreditsEarned: number; // Lifetime SC from hacking
+  hackerRank: HackerRank;       // Title based on stats
+  specializations: string[];    // Unlocked hacker abilities
+}
+
+export type HackerRank = 
+  | 'script_kiddie'     // 0-5 hacks
+  | 'amateur'           // 5-15 hacks
+  | 'hacker'            // 15-30 hacks
+  | 'elite_hacker'      // 30-50 hacks
+  | 'cyber_ninja'       // 50-75 hacks
+  | 'ghost'             // 75-100 hacks
+  | 'legend';           // 100+ hacks with 80%+ success rate
 
 export interface GameState {
   language: Language;
@@ -397,6 +418,9 @@ export interface GameState {
   // LAYER 6: Labs State
   labsState?: LabsPlayerState;
   collectedPrototypes?: CollectedPrototype[];
+
+  // LAYER 14: Hacker Statistics
+  hackerStats?: HackerStats;
 }
 
 export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | 'planet' | string;
