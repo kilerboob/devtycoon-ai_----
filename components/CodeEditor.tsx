@@ -27,6 +27,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const highlightRef = useRef<HTMLDivElement>(null);
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
 
@@ -39,6 +40,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     if (highlightRef.current) {
       highlightRef.current.scrollTop = target.scrollTop;
       highlightRef.current.scrollLeft = target.scrollLeft;
+    }
+    if (lineNumbersRef.current) {
+      lineNumbersRef.current.scrollTop = target.scrollTop;
     }
   }, []);
 
@@ -116,12 +120,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         {/* Line numbers */}
         {showLineNumbers && (
           <div 
-            className="flex-shrink-0 bg-[#1e1e1e] border-r border-slate-700 text-slate-500 text-xs font-mono select-none overflow-hidden"
+            ref={lineNumbersRef}
+            className="flex-shrink-0 bg-[#1e1e1e] border-r border-slate-700 text-slate-500 text-xs font-mono select-none overflow-auto"
             style={{ 
               paddingTop: '16px',
               paddingRight: '8px',
-              paddingLeft: '8px',
-              transform: `translateY(-${scrollTop}px)`
+              paddingLeft: '8px'
             }}
           >
             {lineNumbers.map(num => (
@@ -140,7 +144,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             className="absolute inset-0 p-4 font-mono text-sm whitespace-pre overflow-auto pointer-events-none"
             style={{ 
               lineHeight: '20px',
-              transform: `translate(-${scrollLeft}px, -${scrollTop}px)`,
               paddingTop: '16px'
             }}
           >

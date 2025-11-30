@@ -426,7 +426,7 @@ export interface GameState {
   securityState?: import('./services/securityStore').SecurityState;
 }
 
-export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | 'planet' | 'security' | string;
+export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | 'planet' | 'security' | 'market' | string;
 
 // LAYER 1: DevFS Types
 export interface DevFile {

@@ -125,7 +125,6 @@ CREATE TRIGGER update_corporation_state_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Cleanup old sync events (run periodically)
 CREATE OR REPLACE FUNCTION cleanup_old_sync_events(days_to_keep INTEGER DEFAULT 7)
 RETURNS INTEGER AS $$
 DECLARE
@@ -140,10 +139,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Include LAYER 15 Security schema
 \i security_layer.sql
 
--- Cleanup old chat messages (run periodically)
+-- include market layer
+\i market_layer.sql
+
 CREATE OR REPLACE FUNCTION cleanup_old_chat_messages(days_to_keep INTEGER DEFAULT 30)
 RETURNS INTEGER AS $$
 DECLARE

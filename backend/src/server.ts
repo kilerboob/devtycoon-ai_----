@@ -5,6 +5,8 @@ import { createServer } from 'http';
 import nodeRoutes from './routes/nodeRoutes';
 import securityRoutes from './routes/securityRoutes';
 import securityGuildRoutes from './routes/securityGuildRoutes';
+import marketRoutes from './routes/marketRoutes';
+import darkhubRoutes from './routes/darkhubRoutes';
 import { getDb } from './db';
 import { getWSServer } from './ws/wsServer';
 
@@ -25,6 +27,8 @@ app.use(express.json());
 app.use('/api/nodes/:node_id', nodeRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/security-guild', securityGuildRoutes);
+app.use('/api/market', marketRoutes);
+app.use('/api/darkhub', darkhubRoutes);
 
 // Health Check
 app.get('/health', async (req, res) => {

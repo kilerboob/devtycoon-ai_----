@@ -23,6 +23,7 @@ import { CodeEditor } from './CodeEditor';
 import { SocialHub } from './SocialHub';
 import { LabsApp } from './LabsApp';
 import { PlanetApp } from './PlanetApp';
+import MarketApp from './MarketApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -294,6 +295,8 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'labs', type: 'app', title: 'Labs', icon: '🔬', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 3, appId: 'labs' },
     // Planet Sphere (LAYER 13: CyberNation visualization)
     { id: 'planet', type: 'app', title: 'Planet', icon: '🌍', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 4, appId: 'planet' },
+    // Market (LAYER 16: Legal & Shadow markets)
+    { id: 'market', type: 'app', title: 'Market', icon: '🛒', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H * 4, appId: 'market' },
     // Tutorial Guide App - Help system with all features walkthrough
     { id: 'tutorial', type: 'app', title: 'Гайд', icon: '📖', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'tutorial' },
     // System folder shortcuts - open StorageApp with initial path
@@ -1236,6 +1239,19 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                     state={props.state}
                     onClose={() => toggleApp('planet')}
                 />
+            </div>
+        )}
+        {/* LAYER 16: Market App */}
+        {activeApp === 'market' && !minimized.includes('market') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-cyan-900">
+                <div className="h-8 bg-gradient-to-r from-blue-900 to-blue-700 border-b border-blue-600 flex items-center justify-between px-3">
+                    <span className="text-xs font-bold text-white">🛒 Легальный рынок</span>
+                    <div className="flex gap-2">
+                        <button onClick={() => setMinimized(p => [...p, 'market'])} className="w-3 h-3 rounded-full bg-yellow-500"></button>
+                        <button onClick={() => toggleApp('market')} className="w-3 h-3 rounded-full bg-red-500"></button>
+                    </div>
+                </div>
+                <MarketApp />
             </div>
         )}
         {activeApp === 'settings' && !minimized.includes('settings') && (

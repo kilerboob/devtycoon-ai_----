@@ -2,6 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { HARDWARE_CATALOG } from '../constants';
 
+interface DarkHubItem {
+    id: number;
+    name: string;
+    description?: string;
+    risk_level: string;
+    price: number;
+    stock: number;
+    commission_rate: number;
+}
+
 interface DarkHubProps {
     onClose: () => void;
     shadowCredits: number;
@@ -13,9 +23,11 @@ interface DarkHubProps {
 }
 
 export const DarkHub: React.FC<DarkHubProps> = ({ onClose, shadowCredits, money, globalHeat, onBuy, onExchange, accessExpiry }) => {
-    const [tab, setTab] = useState<'market' | 'laundry'>('market');
+    const [tab, setTab] = useState<'market' | 'laundry' | 'darkhub'>('market');
     const [exchangeAmount, setExchangeAmount] = useState('');
     const [timeLeft, setTimeLeft] = useState('00:00:00');
+    const [darkhubItems, setDarkhubItems] = useState<DarkHubItem[]>([]);
+    const [loading, setLoading] = useState(false);
 
     // Exchange Rate: Higher Heat = Worse Rate
     const exchangeRate = Math.max(0.1, 1 - (globalHeat / 150)); 
@@ -39,11 +51,44 @@ export const DarkHub: React.FC<DarkHubProps> = ({ onClose, shadowCredits, money,
         return () => clearInterval(timer);
     }, [accessExpiry, onClose]);
 
+    // Load DarkHub items with TOR-like delay
+    useEffect(() => {
+        if (tab === 'darkhub') {
+            setLoading(true);
+            const timer = setTimeout(() => {
+                fetch('/api/darkhub/items')
+                    .then(r => r.json())
+                    .then(setDarkhubItems)
+                    .catch(console.error)
+                    .finally(() => setLoading(false));
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+    }, [tab]);
+
     const handleExchange = () => {
         const val = parseInt(exchangeAmount);
         if (val > 0 && val <= money) {
             onExchange(val);
             setExchangeAmount('');
+        }
+    };
+
+    const buyDarkhubItem = async (item: DarkHubItem) => {
+        try {
+            const res = await fetch('/api/darkhub/buy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: 'player', itemId: item.id })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Purchase failed');
+            alert(`🔥 DarkHub покупка: ${item.name}\n💰 ${data.total}\n📊 Комиссия: ${data.commission}\n⚠️ Риск: ${data.risk}`);
+            // Reload items
+            setTab('market');
+            setTimeout(() => setTab('darkhub'), 100);
+        } catch (e: any) {
+            alert('❌ ' + e.message);
         }
     };
 
@@ -80,11 +125,51 @@ export const DarkHub: React.FC<DarkHubProps> = ({ onClose, shadowCredits, money,
                 >
                     THE_LAUNDRY (EXCHANGE)
                 </button>
+                <button 
+                    onClick={() => setTab('darkhub')}
+                    className={`px-6 py-2 border ${tab === 'darkhub' ? 'bg-red-600 text-black border-red-600' : 'border-red-800 text-red-800 hover:text-red-500 hover:border-red-500'}`}
+                >
+                    DARKHUB_ITEMS
+                </button>
             </div>
 
             {/* Content */}
             <div className="h-[calc(100%-150px)] overflow-y-auto custom-scrollbar border border-red-900/30 p-4 bg-black/50 backdrop-blur-sm">
                 
+                {tab === 'darkhub' && (
+                    <div className="space-y-4">
+                        {loading && <div className="text-center text-red-400 animate-pulse">CONNECTING TO TOR NODE...</div>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {darkhubItems.map(item => {
+                                const riskColor = item.risk_level === 'legendary' ? 'text-orange-400' : 
+                                                 item.risk_level === 'high' ? 'text-red-400' :
+                                                 item.risk_level === 'medium' ? 'text-yellow-400' : 'text-green-400';
+                                return (
+                                    <div key={item.id} className="border border-green-700 p-3 bg-[#0b0b0b] shadow-[0_0_10px_#00ff0055] hover:shadow-[0_0_20px_#00ff0099] transition-all">
+                                        <div className="font-bold text-green-300">{item.name}</div>
+                                        <div className={`text-xs ${riskColor} mb-2`}>RISK: {item.risk_level.toUpperCase()}</div>
+                                        {item.description && <div className="text-sm text-slate-300 mb-2">{item.description}</div>}
+                                        <div className="flex justify-between items-center mt-3">
+                                            <div>
+                                                <div className="text-green-400 font-bold">${item.price}</div>
+                                                <div className="text-xs text-green-600">Commission: {item.commission_rate}%</div>
+                                                <div className="text-xs text-slate-500">Stock: {item.stock}</div>
+                                            </div>
+                                            <button 
+                                                onClick={() => buyDarkhubItem(item)}
+                                                disabled={item.stock === 0}
+                                                className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded"
+                                            >
+                                                BUY
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {tab === 'laundry' && (
                     <div className="max-w-xl mx-auto text-center space-y-8 mt-10">
                         <div className="border border-red-500 p-8 rounded shadow-[0_0_20px_rgba(220,38,38,0.2)]">
