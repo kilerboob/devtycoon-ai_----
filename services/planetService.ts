@@ -90,7 +90,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         corporationId: 'titan',
         influence: 75,
         color: '#3B82F6',
-        position: { x: 78, y: 35 },
+        position: { x: 89, y: 36 }, // Tokyo: 139°E, 35°N → x=(139+180)/360*100=88.6, y=(90-35)/180*100=30.5
         radius: 12,
         population: 45,
         techLevel: 5,
@@ -104,7 +104,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         corporationId: 'novatek',
         influence: 85,
         color: '#10B981',
-        position: { x: 15, y: 40 },
+        position: { x: 16, y: 36 }, // San Francisco: -122°W, 37°N → x=(-122+180)/360*100=16.1, y=(90-37)/180*100=29.4
         radius: 10,
         population: 12,
         techLevel: 5,
@@ -118,7 +118,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         corporationId: 'cyberforge',
         influence: 65,
         color: '#8B5CF6',
-        position: { x: 48, y: 30 },
+        position: { x: 54, y: 32 }, // Berlin: 13°E, 52°N → x=(13+180)/360*100=53.6, y=(90-52)/180*100=21.1
         radius: 9,
         population: 18,
         techLevel: 4,
@@ -132,7 +132,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         corporationId: 'orbitron',
         influence: 70,
         color: '#F59E0B',
-        position: { x: 72, y: 55 },
+        position: { x: 79, y: 50 }, // Singapore: 104°E, 1°N → x=(104+180)/360*100=78.9, y=(90-1)/180*100=49.4
         radius: 8,
         population: 8,
         techLevel: 5,
@@ -146,7 +146,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         corporationId: 'blacksun',
         influence: 80,
         color: '#EF4444',
-        position: { x: 55, y: 25 },
+        position: { x: 60, y: 28 }, // Moscow: 37°E, 55°N → x=(37+180)/360*100=60.3, y=(90-55)/180*100=19.4
         radius: 11,
         population: 25,
         techLevel: 4,
@@ -160,7 +160,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         corporationId: 'ang_vers',
         influence: 90,
         color: '#EC4899',
-        position: { x: 75, y: 42 },
+        position: { x: 84, y: 36 }, // Shanghai: 121°E, 31°N → x=(121+180)/360*100=83.6, y=(90-31)/180*100=32.8
         radius: 13,
         population: 55,
         techLevel: 5,
@@ -171,7 +171,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         id: 'dubai_oasis',
         name: 'Dubai Oasis',
         nameRu: 'Дубайский Оазис',
-        position: { x: 58, y: 48 },
+        position: { x: 65, y: 43 }, // Dubai: 55°E, 25°N → x=(55+180)/360*100=65.3, y=(90-25)/180*100=36.1
         radius: 7,
         influence: 40,
         color: '#6B7280',
@@ -184,7 +184,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         id: 'sao_paulo_sprawl',
         name: 'São Paulo Sprawl',
         nameRu: 'Сан-Паулу Спроул',
-        position: { x: 28, y: 65 },
+        position: { x: 37, y: 63 }, // São Paulo: -46°W, -24°S → x=(-46+180)/360*100=37.2, y=(90-(-24))/180*100=63.3
         radius: 10,
         influence: 35,
         color: '#6B7280',
@@ -197,7 +197,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         id: 'lagos_network',
         name: 'Lagos Network',
         nameRu: 'Лагосская Сеть',
-        position: { x: 45, y: 58 },
+        position: { x: 52, y: 53 }, // Lagos: 3°E, 6°N → x=(3+180)/360*100=50.8, y=(90-6)/180*100=46.7
         radius: 8,
         influence: 25,
         color: '#6B7280',
@@ -210,7 +210,7 @@ const INITIAL_ZONES: PlanetZone[] = [
         id: 'sydney_arc',
         name: 'Sydney Arc',
         nameRu: 'Сиднейская Дуга',
-        position: { x: 85, y: 72 },
+        position: { x: 92, y: 69 }, // Sydney: 151°E, -34°S → x=(151+180)/360*100=91.9, y=(90-(-34))/180*100=68.9
         radius: 7,
         influence: 55,
         color: '#6B7280',
@@ -228,11 +228,14 @@ class PlanetService {
     private markers: PlanetMarker[] = [];
     private conflicts: PlanetConflict[] = [];
     private events: PlanetEvent[] = [];
+    private lastUpdate: number = Date.now();
+    private listeners: Array<() => void> = [];
 
     constructor() {
         this.initializeZones();
         this.generateMarkers();
         this.generateConflicts();
+        this.spawnRandomEvent();
     }
 
     private initializeZones(): void {
@@ -325,6 +328,117 @@ class PlanetService {
                 });
             }
         });
+    }
+
+    // === DYNAMIC EVENTS & TICK ===
+    advanceTime(): void {
+        const now = Date.now();
+        const dt = now - this.lastUpdate;
+        this.lastUpdate = now;
+
+        // Progress conflicts
+        this.conflicts.forEach(c => {
+            const inc = Math.random() * (dt / 10000);
+            c.progress = Math.min(100, c.progress + inc);
+            if (c.progress >= 100) {
+                const zone = this.zones.find(z => z.id === c.zoneId);
+                if (zone) {
+                    zone.corporationId = c.attackerId;
+                    zone.status = 'stable';
+                }
+            }
+        });
+        this.conflicts = this.conflicts.filter(c => c.progress < 100);
+
+        // Update & expire events
+        const nowActive: PlanetEvent[] = [];
+        this.events.forEach(ev => {
+            const elapsed = now - ev.startTime;
+            if (elapsed < ev.duration) {
+                const zone = this.zones.find(z => z.id === ev.zoneId);
+                if (zone && ev.effects?.influence) {
+                    zone.influence = Math.max(0, Math.min(100, zone.influence + ev.effects.influence * (dt / ev.duration)));
+                }
+                nowActive.push(ev);
+            } else {
+                const zone = this.zones.find(z => z.id === ev.zoneId);
+                if (zone && zone.status === 'lockdown') zone.status = 'stable';
+            }
+        });
+        this.events = nowActive;
+
+        // Occasionally spawn new event
+        if (Math.random() < 0.1) this.spawnRandomEvent();
+
+        // Sync event markers
+        this.markers = this.markers.filter(m => m.type !== 'event');
+        this.events.forEach(ev => {
+            const zone = this.zones.find(z => z.id === ev.zoneId);
+            if (!zone) return;
+            this.markers.push({
+                id: `event_${ev.id}`,
+                type: 'event',
+                name: ev.name,
+                position: { x: zone.position.x, y: zone.position.y },
+                icon: '⚠️',
+                color: '#F97316',
+                zoneId: zone.id,
+                data: { duration: ev.duration, startTime: ev.startTime, type: ev.type }
+            });
+        });
+
+        this.emitChange();
+    }
+
+    private spawnRandomEvent(): void {
+        const zone = this.zones[Math.floor(Math.random() * this.zones.length)];
+        const types: PlanetEvent['type'][] = ['blackout', 'data_storm', 'market_crash', 'tech_boom', 'cyber_attack'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        const start = Date.now();
+        const duration = 30000 + Math.floor(Math.random() * 30000);
+        const ev: PlanetEvent = {
+            id: `${type}_${start}`,
+            type,
+            zoneId: zone.id,
+            name: this.getEventName(type),
+            description: this.getEventDescription(type),
+            duration,
+            startTime: start,
+            effects: { influence: type === 'tech_boom' ? 5 : type === 'market_crash' ? -5 : 0 }
+        };
+        if (type === 'blackout' || type === 'cyber_attack') zone.status = 'lockdown';
+        this.events.push(ev);
+    }
+
+    private getEventName(type: PlanetEvent['type']): string {
+        switch (type) {
+            case 'blackout': return 'Энергетический блэкаут';
+            case 'data_storm': return 'Шторм данных';
+            case 'market_crash': return 'Обвал рынка';
+            case 'tech_boom': return 'Технологический бум';
+            case 'cyber_attack': return 'Кибер-атака';
+        }
+    }
+
+    private getEventDescription(type: PlanetEvent['type']): string {
+        switch (type) {
+            case 'blackout': return 'Энергосети перегружены, часть зоны недоступна.';
+            case 'data_storm': return 'Сетевые потоки нестабильны, канал связи шумит.';
+            case 'market_crash': return 'Финансовые рынки зоны падают, влияя на корпорации.';
+            case 'tech_boom': return 'Инновационный скачок увеличивает влияние и ресурсы.';
+            case 'cyber_attack': return 'Массированная атака нарушает работу инфраструктуры.';
+        }
+    }
+
+    subscribe(listener: () => void): () => void {
+        this.listeners.push(listener);
+        return () => {
+            this.listeners = this.listeners.filter(l => l !== listener);
+        };
+    }
+
+    private emitChange(): void {
+        this.listeners.forEach(l => l());
     }
 
     // === PUBLIC API ===

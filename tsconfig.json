@@ -11,7 +11,9 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "vitest/globals",
+      "three"
     ],
     "forceConsistentCasingInFileNames": true,
     "strict": true,

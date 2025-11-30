@@ -3,7 +3,7 @@ import { INITIAL_GAME_STATE } from '../constants';
 
 const DB_NAME = 'DevTycoonDB_v1';
 const STORE_NAME = 'gameState';
-const DB_VERSION = 5; // Bump: add shards store for LAYER 4
+const DB_VERSION = 6; // Bump: ensure all stores exist
 
 class DBService {
   private db: IDBDatabase | null = null;
