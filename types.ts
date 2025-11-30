@@ -421,9 +421,12 @@ export interface GameState {
 
   // LAYER 14: Hacker Statistics
   hackerStats?: HackerStats;
+
+  // LAYER 15: Security State (stored separately in securityStore, reference here for save/load)
+  securityState?: import('./services/securityStore').SecurityState;
 }
 
-export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | 'planet' | string;
+export type AppId = 'ide' | 'browser' | 'messenger' | 'video' | 'projects' | 'skills' | 'music' | 'chat' | 'leaderboard' | 'storage' | 'settings' | 'bank' | 'devfs' | 'blueprints' | 'corporations' | 'tutorial' | 'journal' | 'profile' | 'social' | 'labs' | 'planet' | 'security' | string;
 
 // LAYER 1: DevFS Types
 export interface DevFile {

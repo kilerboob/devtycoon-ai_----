@@ -17,11 +17,13 @@ import { onlineService } from './services/onlineMock';
 import { shardService } from './services/shardService';
 import { playerRoleService } from './services/playerRoleService';
 import { labService } from './services/labService';
+import { securityStore } from './services/securityStore';
 import { MatrixBackground } from './components/MatrixBackground';
 import { EndingScreen } from './components/EndingScreen';
 import { NotificationContainer } from './components/NotificationContainer';
 import { AchievementsApp } from './components/AchievementsApp';
 import { JournalApp } from './components/JournalApp';
+import { IDSOverlay } from './components/IDSOverlay';
 
 import ConfirmModal from './components/ConfirmModal';
 import UndoSnackbar from './components/UndoSnackbar';
@@ -2225,6 +2227,9 @@ export default function App() {
                     onSaveDesktopLayout={handleSaveDesktopLayout}
                 />
             )}
+
+            {/* LAYER 15: IDS Overlay - Security Notifications */}
+            <IDSOverlay enabled={true} maxNotifications={5} autoHideDelay={8000} />
 
             {/* Notification System */}
             <NotificationContainer
