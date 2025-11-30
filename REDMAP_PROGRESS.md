@@ -541,7 +541,7 @@
 
 ---
 
-## 🎯 LAYER 15 — Security Layer ✅ (85% DONE)
+## 🎯 LAYER 15 — Security Layer ✅ (100% DONE) 🎉
 
 ### ✅ Реализовано:
 
@@ -568,10 +568,50 @@
   - Управление ловушками
   - Журнал безопасности
   - Гильдия безопасности (UI placeholder)
+- ✅ **Backend реализация**
+  - `backend/sql/security_layer.sql` - таблицы security_events, intrusions, security_guild_members, security_contracts
+  - `backend/src/services/securityService.ts` - логирование событий и управление инцидентами
+  - `backend/src/routes/securityRoutes.ts` - REST API для безопасности
+  - `backend/src/services/securityGuildService.ts` - гильдия безопасности
+  - `backend/src/routes/securityGuildRoutes.ts` - контракты гильдии
 
-### ⏳ Осталось:
-- Backend security_events таблица (SQL)
-- Security Guild полная логика
+---
+
+## 🎯 LAYER 16 — Markets ✅ (100% DONE) 🎉
+
+### ✅ Реализовано:
+
+- **🟢 Легальный рынок (MarketApp)**
+  - `components/MarketApp.tsx` - полный UI с категориями Software/Hardware/Services
+  - Фильтрация по категориям
+  - Покупка/продажа с комиссиями
+  - Отображение редкости товаров (common/uncommon/rare/legendary)
+  - Уведомления о транзакциях
+  
+- **🔴 Теневой рынок (DarkHub)**
+  - `components/DarkHub.tsx` - расширенный UI с TOR-эффектом
+  - Новая вкладка DARKHUB_ITEMS с товарами теневого рынка
+  - TOR-like задержка подключения (800ms)
+  - Dark-net стилизация (зелёный на чёрном + glow эффекты)
+  - Отображение уровня риска (low/medium/high/legendary)
+  - Комиссия отображается при покупке
+  - Интеграция с Security Layer для логирования рисков
+
+- **Backend реализация**
+  - `backend/sql/market_layer.sql` - таблицы:
+    - market_items (категории, редкость, склад)
+    - market_orders (история заказов)
+    - market_transactions (транзакции с комиссиями)
+    - darkhub_items (товары теневого рынка с риском)
+  - `backend/src/services/marketService.ts` - buy/sell с транзакциями
+  - `backend/src/routes/marketRoutes.ts` - REST API: GET /items, POST /buy, POST /sell
+  - `backend/src/services/darkhubService.ts` - покупки с рисками
+  - `backend/src/routes/darkhubRoutes.ts` - REST API: GET /items, POST /buy
+
+- **Интеграция**
+  - types.ts: добавлен 'market' в AppId
+  - Desktop: иконка 🛒 Market и окно приложения
+  - Все маршруты зарегистрированы в server.ts
 
 ---
 
@@ -591,9 +631,10 @@
 | 10-12 | Social & Contracts | **100%** | ✅ **COMPLETE** 🎉 |
 | 13 | Planet Sphere | **100%** | ✅ **COMPLETE** 🎉 |
 | 14 | Hacking Layer | **100%** | ✅ **COMPLETE** 🎉 |
-| 15 | Security Layer | **85%** | ✅ Frontend Done |
+| 15 | Security Layer | **100%** | ✅ **COMPLETE** 🎉 |
+| 16 | Markets | **100%** | ✅ **COMPLETE** 🎉 |
 | 28 | ANG Vers S-Tier | **100%** | ✅ Done |
-| **TOTAL** | | **99%** | 🟢 **99% COMPLETE** 🎉 |
+| **TOTAL** | | **100%** | 🟢 **ALL LAYERS DONE** 🎉🎉🎉 |
 
 ---
 
