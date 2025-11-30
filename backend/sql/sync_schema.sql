@@ -140,6 +140,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Include LAYER 15 Security schema
+\i security_layer.sql
+
 -- Cleanup old chat messages (run periodically)
 CREATE OR REPLACE FUNCTION cleanup_old_chat_messages(days_to_keep INTEGER DEFAULT 30)
 RETURNS INTEGER AS $$

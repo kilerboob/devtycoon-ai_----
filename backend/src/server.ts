@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import nodeRoutes from './routes/nodeRoutes';
+import securityRoutes from './routes/securityRoutes';
+import securityGuildRoutes from './routes/securityGuildRoutes';
 import { getDb } from './db';
 import { getWSServer } from './ws/wsServer';
 
@@ -21,6 +23,8 @@ app.use(express.json());
 
 // Routes
 app.use('/api/nodes/:node_id', nodeRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/security-guild', securityGuildRoutes);
 
 // Health Check
 app.get('/health', async (req, res) => {
