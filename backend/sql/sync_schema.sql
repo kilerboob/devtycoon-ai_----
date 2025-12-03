@@ -139,10 +139,86 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-\i security_layer.sql
+-- LAYER 17: Rooms (social spaces)
+CREATE TABLE IF NOT EXISTS rooms (
+    id BIGSERIAL PRIMARY KEY,
+    owner_id VARCHAR(64) NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    theme VARCHAR(64) DEFAULT 'default',
+    layout JSONB DEFAULT '{}'::JSONB,
+    privacy VARCHAR(16) DEFAULT 'public', -- public | friends | private
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_rooms_owner ON rooms(owner_id);
+
+CREATE TABLE IF NOT EXISTS room_items (
+    id BIGSERIAL PRIMARY KEY,
+    room_id BIGINT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    item_type VARCHAR(64) NOT NULL, -- e.g., 'sofa', 'desk', 'pc_case'
+    asset_id VARCHAR(128), -- reference to AI Assets identifier
+    position JSONB NOT NULL, -- { x, y, z }
+    rotation JSONB DEFAULT '{"x":0,"y":0,"z":0}'::JSONB,
+    scale JSONB DEFAULT '{"x":1,"y":1,"z":1}'::JSONB,
+    properties JSONB DEFAULT '{}'::JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_room_items_room ON room_items(room_id);
+
+-- User PC components installed inside the room's PC
+CREATE TABLE IF NOT EXISTS user_pc_components (
+    id BIGSERIAL PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    room_id BIGINT REFERENCES rooms(id) ON DELETE SET NULL,
+    component_type VARCHAR(64) NOT NULL, -- cpu | gpu | ram | storage | psu | motherboard | cooler
+    model VARCHAR(128) NOT NULL,
+    tier INTEGER DEFAULT 1, -- upgrade level
+    stats JSONB DEFAULT '{}'::JSONB, -- performance metrics
+    installed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uniq_pc_component UNIQUE (user_id, component_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_pc_components_user ON user_pc_components(user_id);
+
+-- Keep updated_at fresh
+DROP TRIGGER IF EXISTS update_rooms_updated_at ON rooms;
+CREATE TRIGGER update_rooms_updated_at
+    BEFORE UPDATE ON rooms
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_room_items_updated_at ON room_items;
+CREATE TRIGGER update_room_items_updated_at
+    BEFORE UPDATE ON room_items
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_user_pc_components_updated_at ON user_pc_components;
+CREATE TRIGGER update_user_pc_components_updated_at
+    BEFORE UPDATE ON user_pc_components
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- LAYER 20: AI Assets (generated furniture, textures, 3D models)
+CREATE TABLE IF NOT EXISTS ai_assets (
+    asset_id VARCHAR(128) PRIMARY KEY,
+    url TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    type VARCHAR(64) NOT NULL, -- furniture | 3d_model | texture | icon
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_assets_type ON ai_assets(type);
+CREATE INDEX IF NOT EXISTS idx_ai_assets_generated ON ai_assets(generated_at DESC);
+
+\i sql/security_layer.sql
 
 -- include market layer
-\i market_layer.sql
+\i sql/market_layer.sql
 
 CREATE OR REPLACE FUNCTION cleanup_old_chat_messages(days_to_keep INTEGER DEFAULT 30)
 RETURNS INTEGER AS $$

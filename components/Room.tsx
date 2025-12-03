@@ -1,22 +1,36 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameState, HardwareItem, SkillLevel, HardwareType, InventoryItem } from '../types';
 import { HARDWARE_CATALOG, TRANSLATIONS } from '../constants';
 import { playSound } from '../utils/sound';
+import { FurnitureEditor } from './FurnitureEditor';
 
 interface RoomProps {
-  state: GameState;
-  onEnterComputer: () => void;
-  onOpenPCInternals: () => void;
-  onSleep: () => void;
-  onOpenJournal: () => void;
-  onEquipItem?: (uid: string) => void; 
-  onCleanItem?: (uid: string) => void;
+    state: GameState;
+    currentRoomId?: number | null;
+    onEnterComputer: () => void;
+    onOpenPCInternals: () => void;
+    onSleep: () => void;
+    onOpenJournal: () => void;
+    onEquipItem?: (uid: string) => void; 
+    onCleanItem?: (uid: string) => void;
+    onToggle3D?: () => void;
+    onSpendMoney?: (amount: number) => void;
 }
 
-export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInternals, onSleep, onOpenJournal, onEquipItem, onCleanItem }) => {
+export const Room: React.FC<RoomProps> = ({ state, currentRoomId: roomIdProp, onEnterComputer, onOpenPCInternals, onSleep, onOpenJournal, onEquipItem, onCleanItem, onToggle3D, onSpendMoney }) => {
   const [customizingSlot, setCustomizingSlot] = useState<HardwareType | null>(null);
+  const [editMode, setEditMode] = useState(false);
+    const [furnitureEditorOpen, setFurnitureEditorOpen] = useState(false);
+    const currentRoomId = roomIdProp ?? 1;
+    const [themeModalOpen, setThemeModalOpen] = useState(false);
+    const [roomTheme, setRoomTheme] = useState<string>('default');
   const t = TRANSLATIONS[state.language];
+
+  const handleRoomEdit = () => {
+    setFurnitureEditorOpen(true);
+    playSound('click');
+  };
 
   // Helper to find Catalog Item from Equipped UID
   const getEquippedCatalogItem = (type: string) => {
@@ -38,6 +52,59 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
   const mousepadClass = getVisual('mousepad');
 
   const equipped = state.equipped; // UIDs
+
+    const THEME_STYLES: Record<string, string> = {
+        default: '',
+        cyberpunk: 'bg-gradient-to-br from-fuchsia-900 via-indigo-900 to-black',
+        minimal: 'bg-gradient-to-br from-slate-100 via-slate-300 to-slate-500 text-slate-800',
+        cozy: 'bg-gradient-to-br from-amber-800 via-amber-700 to-yellow-900',
+        industrial: 'bg-gradient-to-br from-zinc-800 via-zinc-700 to-black'
+    };
+    const themeClass = THEME_STYLES[roomTheme] || '';
+
+    useEffect(() => {
+        // Fetch or create room
+        fetch(`http://localhost:3000/api/rooms/${currentRoomId}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data?.theme) {
+                    setRoomTheme(data.theme);
+                } else {
+                    // Create room if doesn't exist
+                    return fetch(`http://localhost:3000/api/rooms`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ownerId: 'player_1', name: 'My Room', theme: 'default' })
+                    }).then(r => r.json()).then(created => {
+                        if (created?.theme) setRoomTheme(created.theme);
+                    });
+                }
+            })
+                        .catch(() => {
+                const saved = localStorage.getItem(`room_${currentRoomId}_theme`);
+                if (saved) setRoomTheme(saved);
+            });
+    }, [currentRoomId]);
+
+    const handleChangeTheme = (value: string) => {
+        // Update local state immediately
+        setRoomTheme(value);
+        setThemeModalOpen(false);
+        playSound('success');
+        
+        // Save to localStorage as fallback
+        localStorage.setItem(`room_${currentRoomId}_theme`, value);
+        
+        // Try to update backend
+        fetch(`http://localhost:3000/api/rooms/${currentRoomId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: value })
+        })
+            .then(r => r.json())
+            .then(data => { if (data?.theme) setRoomTheme(data.theme); })
+            .catch(err => console.warn('Failed to save theme to backend:', err));
+    };
 
   // Time & Light Logic
   const time = state.timeOfDay || 8;
@@ -93,11 +160,26 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
   };
 
   return (
-    <div 
-        className={`relative w-full h-full overflow-hidden transition-all duration-1000 ${wallClass} bg-cover bg-center font-sans select-none scale-[1] md:scale-100 origin-top-left`}
+    <>
+      {furnitureEditorOpen && (
+        <FurnitureEditor
+          roomId={currentRoomId}
+                    money={state.money}
+                    onSpendMoney={onSpendMoney}
+          onClose={() => setFurnitureEditorOpen(false)}
+        />
+      )}
+      
+            <div 
+                className={`relative w-full h-full overflow-hidden transition-all duration-1000 ${themeClass || 'bg-slate-900'} font-sans select-none scale-[1] md:scale-100 origin-top-left`}
         style={{ transformOrigin: 'top left' }} // Mobile scaling handled in container
         onClick={() => setCustomizingSlot(null)}
-    >
+      >
+       {/* Wall texture/wallpaper overlay */}
+       {wallClass && (
+         <div className={`absolute inset-0 ${wallClass} bg-cover bg-center opacity-40 pointer-events-none z-0`}></div>
+       )}
+
        <div className="absolute inset-0 md:transform-none transform scale-[0.6] origin-top-left w-[166%] h-[166%] md:w-full md:h-full">
        
        {/* ==================== 1. BACKGROUND LAYERS ==================== */}
@@ -294,11 +376,30 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
                <div className="bg-slate-800 p-6 rounded-xl border border-slate-600 shadow-2xl max-w-md w-full" onClick={e => e.stopPropagation()}>
                    <div className="flex justify-between items-center mb-4">
                        <h3 className="text-white font-bold text-lg uppercase flex items-center gap-2">
-                           <span>🛠️</span> Change {customizingSlot}
+                           <span>🛠️</span> {customizingSlot === 'wall' ? 'Room Settings' : `Change ${customizingSlot}`}
                        </h3>
                        <button onClick={() => setCustomizingSlot(null)} className="text-slate-400 hover:text-white">✕</button>
                    </div>
                    
+                   {customizingSlot === 'wall' ? (
+                       <div className="flex flex-col gap-4">
+                           <button
+                               onClick={(e) => { e.stopPropagation(); setFurnitureEditorOpen(true); setCustomizingSlot(null); playSound('click'); }}
+                               className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg text-sm font-bold shadow-lg transition-all flex items-center justify-center gap-2"
+                           >
+                               🛠 Edit Room Furniture
+                           </button>
+                           <button
+                               onClick={(e) => { e.stopPropagation(); setThemeModalOpen(true); setCustomizingSlot(null); playSound('click'); }}
+                               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-lg text-sm font-bold shadow-lg transition-all flex items-center justify-center gap-2"
+                           >
+                               🎨 Change Theme
+                           </button>
+                           <div className="text-xs text-slate-400 mt-2 text-center">
+                               Click anywhere outside to close
+                           </div>
+                       </div>
+                   ) : (
                    <div className="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                        {getInventoryForSlot(customizingSlot).map(item => (
                            <div 
@@ -336,9 +437,37 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
                            </div>
                        )}
                    </div>
+                   )}
                </div>
            </div>
        )}
+
+                {themeModalOpen && (
+                    <div className="absolute inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setThemeModalOpen(false)}>
+                        <div className="bg-slate-900 p-5 rounded-xl border border-slate-700 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-white font-bold text-sm flex items-center gap-2">🎨 Select Theme</h3>
+                                <button onClick={() => setThemeModalOpen(false)} className="text-slate-400 hover:text-white">✕</button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                {['default','cyberpunk','minimal','cozy','industrial'].map(th => (
+                                    <button
+                                        key={th}
+                                        onClick={() => handleChangeTheme(th)}
+                                        className={`h-16 rounded-lg text-xs font-bold uppercase flex items-center justify-center border transition-all
+                                            ${roomTheme === th ? 'border-green-500 ring-2 ring-green-500' : 'border-slate-600 hover:border-blue-400'}
+                                            ${THEME_STYLES[th]}`}
+                                    >
+                                        {th}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="mt-4 text-[10px] text-slate-400">
+                                Theme affects ambient background & mood layers. Stored in DB.
+                            </div>
+                        </div>
+                    </div>
+                )}
 
        {getEquippedCatalogItem('chair')?.id !== 'chair_stool' ? (
            <div 
@@ -367,7 +496,7 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
                {timeString}
            </div>
            
-           <div className="flex gap-2">
+           <div className="flex flex-wrap gap-2">
                <div className="bg-slate-900/80 backdrop-blur border border-slate-600 px-3 py-1 rounded text-xs flex items-center gap-2 text-slate-300">
                    <span>⚡</span>
                    <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
@@ -380,6 +509,16 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
                
                <div className={`bg-slate-900/80 backdrop-blur border border-slate-600 px-3 py-1 rounded text-xs flex items-center gap-2 ${state.temperature > 80 ? 'text-red-400 border-red-500 animate-pulse' : 'text-blue-400'}`}>
                    <span>🌡️ {Math.floor(state.temperature)}°C</span>
+               
+                           {onToggle3D && (
+                               <button
+                                   onClick={onToggle3D}
+                                   className="bg-purple-900/80 backdrop-blur border border-purple-500/50 px-3 py-1 rounded text-xs flex items-center gap-2 text-purple-300 hover:bg-purple-800/90 hover:border-purple-400 transition-all"
+                                   title="Switch to 3D View"
+                               >
+                                   <span>🎮 3D</span>
+                               </button>
+                           )}
                </div>
            </div>
            
@@ -437,5 +576,6 @@ export const Room: React.FC<RoomProps> = ({ state, onEnterComputer, onOpenPCInte
            </div>
        </div>
     </div>
+    </>
   );
 };

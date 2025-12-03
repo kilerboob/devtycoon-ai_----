@@ -7,6 +7,8 @@ import securityRoutes from './routes/securityRoutes';
 import securityGuildRoutes from './routes/securityGuildRoutes';
 import marketRoutes from './routes/marketRoutes';
 import darkhubRoutes from './routes/darkhubRoutes';
+import roomsRoutes from './routes/roomsRoutes';
+import aiAssetsRoutes from './routes/aiAssetsRoutes';
 import { getDb } from './db';
 import { getWSServer } from './ws/wsServer';
 
@@ -18,10 +20,15 @@ const PORT = process.env.PORT || 3000;
 const WS_ENABLED = process.env.WS_ENABLED !== 'false';
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3003', 'http://localhost:5173'],
+  origin: ['http://localhost:3000', 'http://localhost:3003', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost', 'http://frontend'],
   credentials: true
 }));
 app.use(express.json());
+
+// Health check endpoint for Docker
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Routes
 app.use('/api/nodes/:node_id', nodeRoutes);
@@ -29,6 +36,8 @@ app.use('/api/security', securityRoutes);
 app.use('/api/security-guild', securityGuildRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/darkhub', darkhubRoutes);
+app.use('/api', roomsRoutes);
+app.use('/api/ai-assets', aiAssetsRoutes);
 
 // Health Check
 app.get('/health', async (req, res) => {

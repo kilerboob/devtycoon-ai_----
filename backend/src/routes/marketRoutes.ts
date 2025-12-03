@@ -1,9 +1,9 @@
 import express from 'express';
 import { MarketService } from '../services/marketService';
-import { pool } from '../db';
+import { getDb } from '../db';
 
 const router = express.Router();
-const market = new MarketService(pool);
+const market = new MarketService(getDb());
 
 router.get('/items', async (req, res) => {
   try {

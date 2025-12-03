@@ -36,12 +36,31 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ state, onUpdateState, 
   const [securityState, setSecurityState] = useState<SecurityState>(securityStore.getState());
   const [selectedEvent, setSelectedEvent] = useState<SecurityEvent | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [guildJoined, setGuildJoined] = useState(false);
+  const [contracts, setContracts] = useState<any[]>([]);
+  const [contractsLoading, setContractsLoading] = useState(false);
+  const [guildError, setGuildError] = useState<string|undefined>();
+  const [backendEvents, setBackendEvents] = useState<any[]>([]);
+  const [backendLogsLoading, setBackendLogsLoading] = useState(false);
 
   // Подписка на изменения
   useEffect(() => {
     const unsubscribe = securityStore.subscribe(setSecurityState);
     return unsubscribe;
   }, []);
+
+  // Load guild contracts when tab is active
+  useEffect(() => {
+    if (activeTab === 'guild') {
+      setContractsLoading(true);
+      setGuildError(undefined);
+      fetch('/api/security-guild/contracts?status=open')
+        .then(r => r.json())
+        .then(setContracts)
+        .catch(e => setGuildError(e.message))
+        .finally(() => setContractsLoading(false));
+    }
+  }, [activeTab]);
 
   // Статистика
   const stats = useMemo(() => securityStore.getStats(), [securityState]);
@@ -452,17 +471,34 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ state, onUpdateState, 
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-white font-bold text-lg">📋 Журнал безопасности</h3>
-        <select
-          value={eventFilter}
-          onChange={e => setEventFilter(e.target.value as any)}
-          className="bg-slate-700 text-white px-3 py-1 rounded"
-        >
-          <option value="all">Все события</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={eventFilter}
+            onChange={e => setEventFilter(e.target.value as any)}
+            className="bg-slate-700 text-white px-3 py-1 rounded"
+          >
+            <option value="all">Все события</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <button
+            onClick={async () => {
+              setBackendLogsLoading(true);
+              try {
+                const res = await fetch('/api/security/events?limit=50');
+                const data = await res.json();
+                setBackendEvents(data);
+              } finally {
+                setBackendLogsLoading(false);
+              }
+            }}
+            className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-sm"
+          >
+            Загрузить из backend
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -513,41 +549,118 @@ export const SecurityApp: React.FC<SecurityAppProps> = ({ state, onUpdateState, 
       >
         🗑️ Очистить старые логи
       </button>
+
+      {/* Backend events */}
+      <div className="bg-slate-800 rounded-lg p-4">
+        <h4 className="text-white font-semibold mb-2">Backend события</h4>
+        {backendLogsLoading && <div className="text-slate-400">Загрузка…</div>}
+        {!backendLogsLoading && backendEvents.length === 0 && (
+          <div className="text-slate-500">Нет событий в базе</div>
+        )}
+        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          {backendEvents.map((event: any) => (
+            <div key={event.id} className="bg-slate-800 p-3 rounded-lg border-l-4 border-cyan-500">
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-slate-400 text-sm">{event.event_type}</div>
+                <span className="text-xs text-slate-500">{new Date(event.created_at).toLocaleString()}</span>
+              </div>
+              <p className="text-sm text-slate-300">{event.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 
-  // Guild Tab (placeholder)
+  // Guild Tab
   const renderGuild = () => (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-white font-bold text-lg">🛡️ Гильдия Безопасности</h3>
+        {!guildJoined && (
+          <button
+            onClick={async () => {
+              try {
+                const res = await fetch('/api/security-guild/join', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ user_id: state.username || 'player', username: state.username || 'player' })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Join failed');
+                setGuildJoined(true);
+              } catch (e: any) {
+                setGuildError(e.message);
+              }
+            }}
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded"
+          >
+            Вступить в гильдию
+          </button>
+        )}
       </div>
 
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg p-6 text-center">
-        <span className="text-5xl">🏛️</span>
-        <h4 className="text-white font-bold text-xl mt-4">Security Guild</h4>
-        <p className="text-slate-400 mt-2">
-          Присоединяйтесь к гильдии безопасности для доступа к контрактам защиты корпораций
-        </p>
-        
-        <div className="mt-6 space-y-3">
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-cyan-400 font-medium">Контракты защиты</div>
-            <div className="text-sm text-slate-400">Защищайте корпорации от хакеров</div>
-          </div>
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-purple-400 font-medium">Расследования</div>
-            <div className="text-sm text-slate-400">Расследуйте кибератаки</div>
-          </div>
-          <div className="bg-slate-700/50 rounded-lg p-3">
-            <div className="text-green-400 font-medium">Охота за багами</div>
-            <div className="text-sm text-slate-400">Находите уязвимости и получайте награды</div>
-          </div>
-        </div>
+      {guildError && (
+        <div className="text-red-400 text-sm">{guildError}</div>
+      )}
 
-        <button className="mt-6 px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium">
-          Вступить в гильдию
-        </button>
+      <div className="bg-slate-800 rounded-lg p-4">
+        <h4 className="text-white font-semibold mb-2">Открытые контракты</h4>
+        {contractsLoading && <div className="text-slate-400">Загрузка…</div>}
+        {!contractsLoading && contracts.length === 0 && (
+          <div className="text-slate-500">Нет открытых контрактов</div>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {contracts.map((c: any) => (
+            <div key={c.id} className="bg-slate-700 rounded p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-white font-medium">{c.title || `Контракт #${c.id}`}</div>
+                <span className="text-xs text-slate-400">{c.status}</span>
+              </div>
+              {c.description && (
+                <div className="text-sm text-slate-300 mt-1">{c.description}</div>
+              )}
+              <div className="text-xs text-slate-400 mt-2">
+                Заказчик: {c.corporation_id || 'N/A'} | Награда: {c.reward_amount || 0}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/security-guild/contracts/${c.id}/assign`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: state.username || 'player' })
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'Assign failed');
+                      setContracts(prev => prev.map(ci => ci.id === c.id ? { ...ci, assigned_to_user_id: state.username, status: 'assigned' } : ci));
+                    } catch (e: any) {
+                      setGuildError(e.message);
+                    }
+                  }}
+                  className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded"
+                >
+                  Назначить мне
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/security-guild/contracts/${c.id}/complete`, { method: 'POST' });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error || 'Complete failed');
+                      setContracts(prev => prev.map(ci => ci.id === c.id ? { ...ci, status: 'completed', completed_at: new Date().toISOString() } : ci));
+                    } catch (e: any) {
+                      setGuildError(e.message);
+                    }
+                  }}
+                  className="px-3 py-1 bg-green-600 hover:bg-green-500 text-white text-sm rounded"
+                >
+                  Завершить
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,19 @@
+# Docker ignore for frontend
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.local
+*.log
+coverage
+.DS_Store
+backend
+docs
+memory-bank
+orchestrator
+tasks
+tests
+vectordb
+*.md
+!README.md

@@ -277,7 +277,7 @@ export const HARDWARE_CATALOG: HardwareItem[] = [
 export const INITIAL_GAME_STATE: GameState = {
     language: 'ru',
     username: 'Guest',
-    money: 100,
+    money: 5000,
     shadowCredits: 0,
     reputation: 0,
     linesOfCode: 0,
@@ -297,8 +297,12 @@ export const INITIAL_GAME_STATE: GameState = {
     tracePercent: 0,
     marketTrends: {},
 
+    // Dev override: unlock DarkHub without quest when VITE_DEV_DARKHUB_UNLOCK=true
+    // Uses Vite env at runtime; safe for development. Do not enable in production.
     signalEndTime: 0,
-    shadowAccessExpiry: 0,
+    shadowAccessExpiry: (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_DEV_DARKHUB_UNLOCK === 'true')
+        ? (Date.now() + 2 * 60 * 60 * 1000) // 2 hours
+        : 0,
 
     // Bank
     bills: [],
@@ -315,7 +319,9 @@ export const INITIAL_GAME_STATE: GameState = {
     ],
 
     currentQuestIndex: 0,
-    isShadowMarketUnlocked: false,
+    isShadowMarketUnlocked: (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_DEV_DARKHUB_UNLOCK === 'true')
+        ? true
+        : false,
 
     activeProject: null,
     releasedProjects: [],

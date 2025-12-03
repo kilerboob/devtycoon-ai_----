@@ -1,9 +1,8 @@
 import express from 'express';
-import { DarkHubService } from '../services/darkhubService';
-import { pool } from '../db';
+import { darkhubService } from '../services/darkhubService';
 
 const router = express.Router();
-const darkhub = new DarkHubService(pool);
+const darkhub = darkhubService;
 
 router.get('/items', async (_req, res) => {
   try {

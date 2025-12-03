@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { getDbPool } from '../db';
+import { getDb } from '../db';
 
 export interface SecurityEventRow {
   id: number;
@@ -34,7 +34,7 @@ export interface IntrusionRow {
 export class SecurityService {
   private pool: Pool;
   constructor() {
-    this.pool = getDbPool();
+    this.pool = getDb();
   }
 
   async logSecurityEvent(event: Omit<SecurityEventRow, 'id' | 'created_at'>): Promise<SecurityEventRow> {

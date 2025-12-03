@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { INITIAL_GAME_STATE, CODE_SNIPPETS, LEARNING_QUESTS, HARDWARE_CATALOG, SKILL_TREE, FILE_SYSTEM_INIT, BANK_CONSTANTS, NEWS_TEMPLATES, EMAIL_TEMPLATES, ACHIEVEMENTS } from './constants';
 import { GameState, LogEntry, Project, SkillLevel, HardwareItem, ProjectTemplate, UserApp, ProgrammingLanguage, ChatMessage, ServerRegion, InventoryItem, FileNode, Language, HardwareType, Bill, BankTransaction, NewsArticle, Email, Notification, PlayerRole, Blueprint, CorporationId, CorpMembership, CorpQuest, DesktopItem, HackerStats, HackerRank } from './types';
 import { Room } from './components/Room';
+import Room3D from './components/Room3D';
+import AdvancedFurnitureEditor from './components/AdvancedFurnitureEditor';
 import { Desktop } from './components/Desktop';
 import { StoryModal } from './components/StoryModal';
 import { PCInternals } from './components/PCInternals';
@@ -87,7 +89,27 @@ export default function App() {
     const [hasSave, setHasSave] = useState(false);
     const [hasSelectedShard, setHasSelectedShard] = useState(false);
 
-    const [view, setView] = useState<'ROOM' | 'DESKTOP'>('ROOM');
+    const [view, setView] = useState<'ROOM' | 'ROOM3D' | 'DESKTOP'>('ROOM');
+        const [currentRoomId, setCurrentRoomId] = useState<number | null>(null);
+        useEffect(() => {
+            let mounted = true;
+            (async () => {
+                try {
+                    const list = await fetch('http://localhost:3000/api/rooms').then(r => r.ok ? r.json() : []);
+                    let room = Array.isArray(list) ? list.find((r: any) => r?.ownerId === 'player_1') : null;
+                    if (!room) {
+                        const created = await fetch('http://localhost:3000/api/rooms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ownerId: 'player_1', name: 'My Room', theme: 'default' })
+                        }).then(r => r.json());
+                        room = created;
+                    }
+                    if (mounted && room?.id) setCurrentRoomId(room.id);
+                } catch {}
+            })();
+            return () => { mounted = false; };
+        }, []);
     const [isPCBuildMode, setIsPCBuildMode] = useState(false);
     const [isJournalOpen, setIsJournalOpen] = useState(false);
     const [isHacking, setIsHacking] = useState(false);
@@ -457,6 +479,12 @@ export default function App() {
                     activeCorpQuests: savedState.activeCorpQuests || [],
                     completedCorpQuests: savedState.completedCorpQuests || []
                 };
+
+                // Dev override: unlock DarkHub if VITE_DEV_DARKHUB_UNLOCK=true even with a saved game
+                if ((typeof import.meta !== 'undefined') && (import.meta as any).env && (import.meta as any).env.VITE_DEV_DARKHUB_UNLOCK === 'true') {
+                    sanitizedState.isShadowMarketUnlocked = true;
+                    sanitizedState.shadowAccessExpiry = Date.now() + 2 * 60 * 60 * 1000; // 2 hours access
+                }
 
                 setGameState(sanitizedState);
                 
@@ -2169,12 +2197,26 @@ export default function App() {
             {view === 'ROOM' ? (
                 <Room
                     state={gameState}
+                    currentRoomId={currentRoomId}
                     onEnterComputer={() => { playSound('click'); setView('DESKTOP'); }}
                     onOpenPCInternals={() => { playSound('click'); setIsPCBuildMode(true); }}
                     onSleep={handleSleep}
                     onOpenJournal={() => { console.log('onOpenJournal called!'); playSound('click'); setIsJournalOpen(true); }}
                     onEquipItem={handleEquipInternal}
                     onCleanItem={handleCleanItem}
+                    onToggle3D={() => { playSound('click'); setView('ROOM3D'); setCurrentRoomId(currentRoomId); }}
+                    onSpendMoney={handleSpendMoney}
+                />
+            ) : view === 'ROOM3D' ? (
+                <Room3D
+                    currentRoomId={currentRoomId ?? 1}
+                    onBack={() => { playSound('click'); setView('ROOM'); }}
+                    onEnterComputer={() => { playSound('click'); setView('DESKTOP'); }}
+                    onOpenPCInternals={() => { playSound('click'); setIsPCBuildMode(true); }}
+                    onSleep={handleSleep}
+                    onOpenJournal={() => { console.log('onOpenJournal called!'); playSound('click'); setIsJournalOpen(true); }}
+                    money={gameState.money}
+                    onSpendMoney={handleSpendMoney}
                 />
             ) : (
                 <Desktop

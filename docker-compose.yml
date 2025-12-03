@@ -1,0 +1,73 @@
+name: devtycoon
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: devtycoon_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devtycoon
+      POSTGRES_PASSWORD: devtycoon_pass
+      POSTGRES_DB: devtycoon_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - devtycoon-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devtycoon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    container_name: devtycoon_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://devtycoon:devtycoon_pass@postgres:5432/devtycoon_db
+      DB_USER: devtycoon
+      DB_HOST: postgres
+      DB_NAME: devtycoon_db
+      DB_PASSWORD: devtycoon_pass
+      DB_PORT: 5432
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - devtycoon-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: devtycoon_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - devtycoon-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  devtycoon-network:
+    driver: bridge

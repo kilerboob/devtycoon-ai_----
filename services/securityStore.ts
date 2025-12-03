@@ -309,6 +309,9 @@ class SecurityStore {
 
     this.notify();
 
+    // Async: send to backend log
+    this.logEventToBackend(event).catch(() => { /* silent */ });
+
     return { blocked, detected, event };
   }
 
@@ -382,6 +385,10 @@ class SecurityStore {
     }
 
     this.notify();
+
+    if (event) {
+      this.logEventToBackend(event).catch(() => { /* silent */ });
+    }
 
     return { success: true, honeypot, event };
   }
@@ -476,6 +483,30 @@ class SecurityStore {
       honeypots: [...DEFAULT_HONEYPOTS]
     };
     this.notify();
+  }
+
+  // Отправка события безопасности в backend
+  private async logEventToBackend(event: SecurityEvent): Promise<void> {
+    try {
+      await fetch('/api/security/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_type: event.type,
+          severity: event.severity,
+          status: event.status,
+          source_id: event.sourceId,
+          source_name: event.sourceName,
+          target_path: event.targetPath,
+          description: event.description,
+          blocked: event.blocked,
+          damage_dealt: event.damageDealt,
+          honeypot_id: event.honeypotId
+        })
+      });
+    } catch (e) {
+      // no-op: offline or backend not running
+    }
   }
 }
 

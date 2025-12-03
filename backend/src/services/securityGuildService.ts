@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { getDbPool } from '../db';
+import { getDb } from '../db';
 
 export interface SecurityGuildMemberRow {
   id: number;
@@ -27,7 +27,7 @@ export interface SecurityContractRow {
 export class SecurityGuildService {
   private pool: Pool;
   constructor() {
-    this.pool = getDbPool();
+    this.pool = getDb();
   }
 
   async joinGuild(userId: string, username: string): Promise<SecurityGuildMemberRow> {

@@ -11,6 +11,10 @@ interface PCInternalsProps {
 }
 
 export const PCInternals: React.FC<PCInternalsProps> = ({ state, onClose, onEquip }) => {
+  // LAYER 17: Future integration - fetch user_pc_components from /api/pc/components/:userId
+  // and save upgrades via POST /api/pc/upgrade when onEquip is called.
+  // For now, using local state.equipped from GameState.
+
   // Get all items owned but not currently equipped for a specific slot
   const getInventoryForSlot = (type: string) => {
     return state.inventory.filter(i => {
@@ -171,6 +175,9 @@ export const PCInternals: React.FC<PCInternalsProps> = ({ state, onClose, onEqui
             <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
                 <span>⚙️</span> Components
             </h2>
+            <div className="text-[9px] text-purple-400 bg-purple-900/20 border border-purple-700 rounded px-2 py-1 mb-2">
+              🔧 LAYER 17: PC upgrades can sync to <code className="font-mono">/api/pc/upgrade</code>
+            </div>
             
             {renderSlot('Cooling System', 'cooler', '❄️')}
             {renderSlot('Processor (CPU)', 'cpu', '🧠')}
