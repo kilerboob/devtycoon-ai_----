@@ -9,6 +9,7 @@ import marketRoutes from './routes/marketRoutes';
 import darkhubRoutes from './routes/darkhubRoutes';
 import roomsRoutes from './routes/roomsRoutes';
 import aiAssetsRoutes from './routes/aiAssetsRoutes';
+import serverRoomsRoutes from './routes/serverRoomsRoutes';
 import { getDb } from './db';
 import { getWSServer } from './ws/wsServer';
 
@@ -38,6 +39,7 @@ app.use('/api/market', marketRoutes);
 app.use('/api/darkhub', darkhubRoutes);
 app.use('/api', roomsRoutes);
 app.use('/api/ai-assets', aiAssetsRoutes);
+app.use('/api/server-rooms', serverRoomsRoutes);
 
 // Health Check
 app.get('/health', async (req, res) => {

@@ -24,6 +24,7 @@ import { SocialHub } from './SocialHub';
 import { LabsApp } from './LabsApp';
 import { PlanetApp } from './PlanetApp';
 import MarketApp from './MarketApp';
+import ServerRoomsApp from './ServerRoomsApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -293,8 +294,10 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'social', type: 'app', title: 'SocialHub', icon: '👥', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 2, appId: 'social' },
     // Labs Network (LAYER 6: Independent Labs, hacking, prototypes)
     { id: 'labs', type: 'app', title: 'Labs', icon: '🔬', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 3, appId: 'labs' },
+    // Server Rooms (LAYER 18: PvE/PvP raiding, hacking minigame)
+    { id: 'serverrooms', type: 'app', title: 'Raids', icon: '🌐', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 4, appId: 'serverrooms' },
     // Planet Sphere (LAYER 13: CyberNation visualization)
-    { id: 'planet', type: 'app', title: 'Planet', icon: '🌍', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 4, appId: 'planet' },
+    { id: 'planet', type: 'app', title: 'Planet', icon: '🌍', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 5, appId: 'planet' },
     // Market (LAYER 16: Legal & Shadow markets)
     { id: 'market', type: 'app', title: 'Market', icon: '🛒', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H * 4, appId: 'market' },
     // Tutorial Guide App - Help system with all features walkthrough
@@ -1230,6 +1233,18 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                     }}
                     onClose={() => toggleApp('labs')}
                 />
+            </div>
+        )}
+        {/* LAYER 18: Server Rooms - PvE/PvP Raiding, Hacking Minigame */}
+        {activeApp === 'serverrooms' && !minimized.includes('serverrooms') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-cyan-900">
+                <div className="h-8 bg-gradient-to-r from-cyan-900 to-purple-900 border-b border-cyan-600 flex items-center justify-between px-3">
+                    <div className="text-sm font-bold text-cyan-300">🌐 Server Rooms - Raids & Hacking</div>
+                    <button onClick={() => toggleApp('serverrooms')} className="w-3 h-3 rounded-full bg-red-500"></button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <ServerRoomsApp />
+                </div>
             </div>
         )}
         {/* LAYER 13: Planet Sphere - CyberNation Visualization */}
