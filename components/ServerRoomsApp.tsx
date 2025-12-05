@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { playSound } from '../utils/sound';
+import { useRaidWebSocket } from '../hooks/useRaidWebSocket';
 
 interface ServerRoom {
   id: number;
@@ -36,6 +37,12 @@ interface HackingGameState {
   currentChallenge: string;
 }
 
+interface RaidParticipant {
+  playerId: string;
+  username: string;
+  joined: boolean;
+}
+
 export default function ServerRoomsApp() {
   const [serverRooms, setServerRooms] = useState<ServerRoom[]>([]);
   const [activeRaids, setActiveRaids] = useState<Raid[]>([]);
@@ -43,7 +50,80 @@ export default function ServerRoomsApp() {
   const [userRaid, setUserRaid] = useState<Raid | null>(null);
   const [hackingGame, setHackingGame] = useState<HackingGameState | null>(null);
   const [selectedRaidType, setSelectedRaidType] = useState<'solo' | 'group'>('solo');
+  const [raidParticipants, setRaidParticipants] = useState<RaidParticipant[]>([]);
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get player info (mock for now)
+  const playerId = localStorage.getItem('playerId') || 'player-1';
+  const username = localStorage.getItem('playerName') || 'Player';
+
+  // Initialize WebSocket for raids
+  const { joinRaid, emitHackAttempt, emitProgress, emitRaidComplete, onRaidEvent } = useRaidWebSocket({
+    playerId,
+    username
+  });
+
+  // Listen to raid events
+  useEffect(() => {
+    onRaidEvent((event) => {
+      console.log('[Raid Event]', event.type, event.payload);
+
+      switch (event.type) {
+        case 'RAID_PARTICIPANT_JOINED':
+          setRaidParticipants(prev => {
+            const exists = prev.find(p => p.playerId === event.payload.playerId);
+            if (!exists) {
+              return [...prev, {
+                playerId: event.payload.playerId,
+                username: event.payload.username,
+                joined: true
+              }];
+            }
+            return prev;
+          });
+          break;
+
+        case 'RAID_HACK_ATTEMPT':
+          if (event.payload.success) {
+            playSound('success');
+            setHackingGame(prev => prev ? {
+              ...prev,
+              progress: event.payload.progress,
+              successCount: prev.successCount + 1
+            } : null);
+          } else {
+            playSound('error');
+            setHackingGame(prev => prev ? {
+              ...prev,
+              attempts: prev.attempts - 1,
+              failureCount: prev.failureCount + 1
+            } : null);
+          }
+          break;
+
+        case 'RAID_PROGRESS_UPDATE':
+          setHackingGame(prev => prev ? {
+            ...prev,
+            progress: event.payload.hackProgress,
+            phase: event.payload.phase
+          } : null);
+          break;
+
+        case 'RAID_DAMAGE':
+          console.log(`[Damage] ${event.payload.damage} to ${event.payload.target}`);
+          break;
+
+        case 'RAID_LOOT_DROP':
+          playSound('coin');
+          console.log(`[Loot] ${event.payload.itemId} (${event.payload.rarity})`);
+          break;
+
+        case 'RAID_COMPLETED':
+          handleRaidCompleted(event.payload);
+          break;
+      }
+    });
+  }, [onRaidEvent]);
 
   // Загрузить серверные комнаты
   useEffect(() => {
@@ -90,16 +170,25 @@ export default function ServerRoomsApp() {
         body: JSON.stringify({
           server_room_id: selectedRoom.id,
           raid_type: selectedRaidType,
-          player_id: 1,
-          username: 'Player'
+          player_id: playerId,
+          username: username
         })
       });
 
       if (response.ok) {
         const raid = await response.json();
         setUserRaid(raid);
+        
+        // Join raid via WebSocket
+        joinRaid(raid.id);
+        setRaidParticipants([{
+          playerId,
+          username,
+          joined: true
+        }]);
+
         // Начать мини-игру взлома
-        startHackingGame(selectedRoom.difficulty);
+        startHackingGame(selectedRoom.difficulty, raid.id);
         playSound?.('success');
       }
     } catch (error) {
@@ -108,7 +197,7 @@ export default function ServerRoomsApp() {
   };
 
   // Запустить мини-игру взлома
-  const startHackingGame = (difficulty: string) => {
+  const startHackingGame = (difficulty: string, raidId: number) => {
     const difficultyMap = { easy: 1, normal: 2, hard: 3, legendary: 5 };
     const level = difficultyMap[difficulty as keyof typeof difficultyMap] || 1;
 
@@ -124,6 +213,9 @@ export default function ServerRoomsApp() {
     };
 
     setHackingGame(gameState);
+    
+    // Emit progress to WebSocket
+    emitProgress(raidId, 0, 'HACKING_STARTED');
   };
 
   // Генерировать одну задачу
@@ -148,6 +240,9 @@ export default function ServerRoomsApp() {
       successCount: hackingGame.successCount + 1,
       currentChallenge: newProgress < 100 ? generateChallenge() : ''
     };
+
+    // Emit hack attempt to WebSocket
+    emitHackAttempt(userRaid.id, true, newProgress);
 
     if (newProgress === 100) {
       // Взлом завершён
@@ -178,6 +273,17 @@ export default function ServerRoomsApp() {
     }
   };
 
+  // Handle raid completion from WebSocket
+  const handleRaidCompleted = (payload: any) => {
+    console.log('[Raid Completed]', payload);
+    // Reset state after raid completion broadcast
+    setTimeout(() => {
+      setHackingGame(null);
+      setUserRaid(null);
+      setRaidParticipants([]);
+    }, 2000);
+  };
+
   // Завершить рейд
   const completeRaid = async (success: boolean) => {
     if (!userRaid || !selectedRoom) return;
@@ -190,6 +296,9 @@ export default function ServerRoomsApp() {
           }
         : { credits: 0, xp: 0 };
 
+      // Emit raid completion via WebSocket
+      emitRaidComplete(userRaid.id, success, totalRewards);
+
       const response = await fetch(`http://localhost:3000/api/raids/${userRaid.id}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,8 +307,6 @@ export default function ServerRoomsApp() {
 
       if (response.ok) {
         playSound?.(success ? 'success' : 'error');
-        setHackingGame(null);
-        setUserRaid(null);
       }
     } catch (error) {
       console.error('Failed to complete raid:', error);

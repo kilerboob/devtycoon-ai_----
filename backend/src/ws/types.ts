@@ -19,6 +19,13 @@ export type SyncEventType =
   // Corporation events
   | 'CORP_ACTION'
   | 'CORP_UPDATE'
+  // Raid events
+  | 'RAID_PARTICIPANT_JOINED'
+  | 'RAID_HACK_ATTEMPT'
+  | 'RAID_PROGRESS_UPDATE'
+  | 'RAID_DAMAGE'
+  | 'RAID_LOOT_DROP'
+  | 'RAID_COMPLETED'
   // Global events
   | 'GLOBAL_EVENT'
   | 'LEADERBOARD_UPDATE'
@@ -113,6 +120,61 @@ export interface CorpUpdatePayload {
     level: number;
     territories: string[];
   }>;
+}
+
+// === RAID EVENTS ===
+
+export interface RaidParticipantJoinedPayload {
+  raidId: number;
+  playerId: string;
+  username: string;
+  timestamp: number;
+}
+
+export interface RaidHackAttemptPayload {
+  raidId: number;
+  playerId: string;
+  success: boolean;
+  progress: number;
+  timestamp: number;
+}
+
+export interface RaidProgressUpdatePayload {
+  raidId: number;
+  hackProgress: number;
+  phase: string;
+  timestamp: number;
+}
+
+export interface RaidDamagePayload {
+  raidId: number;
+  playerId: string;
+  damage: number;
+  target: string;
+  timestamp: number;
+}
+
+export interface RaidLootDropPayload {
+  raidId: number;
+  itemId: string;
+  rarity: string;
+  value: number;
+  timestamp: number;
+}
+
+export interface RaidCompletedPayload {
+  raidId: number;
+  success: boolean;
+  rewards: {
+    currency: number;
+    xp: number;
+    items: Array<{
+      id: string;
+      rarity: string;
+      value: number;
+    }>;
+  };
+  timestamp: number;
 }
 
 // === GLOBAL EVENTS ===

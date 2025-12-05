@@ -121,10 +121,197 @@ export class WebSocketServer {
       socket.emit('pong', { clientTimestamp: timestamp, serverTimestamp: Date.now() });
     });
 
+    // Raid events
+    socket.on('raid:join', (data: { raidId: number; playerId: string; username: string }) => {
+      this.handleRaidJoin(socket, data);
+    });
+
+    socket.on('raid:hack-attempt', (data: { raidId: number; playerId: string; success: boolean; progress: number }) => {
+      this.handleRaidHackAttempt(socket, data);
+    });
+
+    socket.on('raid:progress', (data: { raidId: number; hackProgress: number; phase: string }) => {
+      this.handleRaidProgress(socket, data);
+    });
+
+    socket.on('raid:damage', (data: { raidId: number; playerId: string; damage: number; target: string }) => {
+      this.handleRaidDamage(socket, data);
+    });
+
+    socket.on('raid:loot-drop', (data: { raidId: number; itemId: string; rarity: string; value: number }) => {
+      this.handleRaidLootDrop(socket, data);
+    });
+
+    socket.on('raid:complete', (data: { raidId: number; success: boolean; rewards: any }) => {
+      this.handleRaidComplete(socket, data);
+    });
+
     // Error handler
     socket.on('error', (error) => {
       console.error(`[WSServer] Socket error ${socket.id}:`, error);
     });
+  }
+
+  /**
+   * Handle raid participant join
+   */
+  private handleRaidJoin(socket: Socket, data: { raidId: number; playerId: string; username: string }): void {
+    const client = this.clients.get(socket.id);
+    if (!client) return;
+
+    const room = `raid:${data.raidId}`;
+    socket.join(room);
+
+    const event = this.createEvent('RAID_PARTICIPANT_JOINED', {
+      raidId: data.raidId,
+      playerId: data.playerId,
+      username: data.username,
+      timestamp: Date.now()
+    }, client.playerId, client.shardId);
+
+    this.broadcastToRoom(room, event);
+
+    if (this.redisAdapter) {
+      this.redisAdapter.publish(room, event);
+    }
+
+    console.log(`[WSServer] Player ${data.username} joined raid ${data.raidId}`);
+  }
+
+  /**
+   * Handle hack attempt
+   */
+  private handleRaidHackAttempt(socket: Socket, data: { raidId: number; playerId: string; success: boolean; progress: number }): void {
+    const client = this.clients.get(socket.id);
+    if (!client) return;
+
+    const room = `raid:${data.raidId}`;
+
+    const event = this.createEvent('RAID_HACK_ATTEMPT', {
+      raidId: data.raidId,
+      playerId: data.playerId,
+      success: data.success,
+      progress: data.progress,
+      timestamp: Date.now()
+    }, client.playerId, client.shardId);
+
+    this.broadcastToRoom(room, event);
+
+    if (this.redisAdapter) {
+      this.redisAdapter.publish(room, event);
+    }
+
+    console.log(`[WSServer] Hack attempt in raid ${data.raidId}: ${data.success ? 'SUCCESS' : 'FAILURE'}`);
+  }
+
+  /**
+   * Handle raid progress update
+   */
+  private handleRaidProgress(socket: Socket, data: { raidId: number; hackProgress: number; phase: string }): void {
+    const client = this.clients.get(socket.id);
+    if (!client) return;
+
+    const room = `raid:${data.raidId}`;
+
+    const event = this.createEvent('RAID_PROGRESS_UPDATE', {
+      raidId: data.raidId,
+      hackProgress: data.hackProgress,
+      phase: data.phase,
+      timestamp: Date.now()
+    }, client.playerId, client.shardId);
+
+    this.broadcastToRoom(room, event);
+
+    if (this.redisAdapter) {
+      this.redisAdapter.publish(room, event);
+    }
+
+    console.log(`[WSServer] Raid ${data.raidId} progress: ${data.hackProgress}% (${data.phase})`);
+  }
+
+  /**
+   * Handle damage dealt
+   */
+  private handleRaidDamage(socket: Socket, data: { raidId: number; playerId: string; damage: number; target: string }): void {
+    const client = this.clients.get(socket.id);
+    if (!client) return;
+
+    const room = `raid:${data.raidId}`;
+
+    const event = this.createEvent('RAID_DAMAGE', {
+      raidId: data.raidId,
+      playerId: data.playerId,
+      damage: data.damage,
+      target: data.target,
+      timestamp: Date.now()
+    }, client.playerId, client.shardId);
+
+    this.broadcastToRoom(room, event);
+
+    if (this.redisAdapter) {
+      this.redisAdapter.publish(room, event);
+    }
+
+    console.log(`[WSServer] Damage in raid ${data.raidId}: ${data.damage} to ${data.target}`);
+  }
+
+  /**
+   * Handle loot drop
+   */
+  private handleRaidLootDrop(socket: Socket, data: { raidId: number; itemId: string; rarity: string; value: number }): void {
+    const client = this.clients.get(socket.id);
+    if (!client) return;
+
+    const room = `raid:${data.raidId}`;
+
+    const event = this.createEvent('RAID_LOOT_DROP', {
+      raidId: data.raidId,
+      itemId: data.itemId,
+      rarity: data.rarity,
+      value: data.value,
+      timestamp: Date.now()
+    }, client.playerId, client.shardId);
+
+    this.broadcastToRoom(room, event);
+
+    if (this.redisAdapter) {
+      this.redisAdapter.publish(room, event);
+    }
+
+    console.log(`[WSServer] Loot drop in raid ${data.raidId}: ${data.itemId} (${data.rarity})`);
+  }
+
+  /**
+   * Handle raid completion
+   */
+  private handleRaidComplete(socket: Socket, data: { raidId: number; success: boolean; rewards: any }): void {
+    const client = this.clients.get(socket.id);
+    if (!client) return;
+
+    const room = `raid:${data.raidId}`;
+
+    const event = this.createEvent('RAID_COMPLETED', {
+      raidId: data.raidId,
+      success: data.success,
+      rewards: data.rewards,
+      timestamp: Date.now()
+    }, client.playerId, client.shardId);
+
+    this.broadcastToRoom(room, event);
+
+    if (this.redisAdapter) {
+      this.redisAdapter.publish(room, event);
+    }
+
+    // Clean up raid room after 5 seconds
+    setTimeout(() => {
+      const io = this.io;
+      if (io) {
+        io.in(room).disconnectSockets();
+      }
+    }, 5000);
+
+    console.log(`[WSServer] Raid ${data.raidId} completed (success: ${data.success})`);
   }
 
   /**
