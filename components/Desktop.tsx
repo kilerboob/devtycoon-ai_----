@@ -25,6 +25,7 @@ import { LabsApp } from './LabsApp';
 import { PlanetApp } from './PlanetApp';
 import MarketApp from './MarketApp';
 import ServerRoomsApp from './ServerRoomsApp';
+import RaidLeaderboardApp from './RaidLeaderboardApp';
 import { compileToRuntime } from '../utils/visualCompiler';
 import { playSound } from '../utils/sound';
 import { LORE_LIBRARY, TRANSLATIONS } from '../constants';
@@ -296,10 +297,12 @@ const SYSTEM_APPS: DesktopItem[] = [
     { id: 'labs', type: 'app', title: 'Labs', icon: '🔬', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 3, appId: 'labs' },
     // Server Rooms (LAYER 18: PvE/PvP raiding, hacking minigame)
     { id: 'serverrooms', type: 'app', title: 'Raids', icon: '🌐', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 4, appId: 'serverrooms' },
+    // Raid Leaderboard (LAYER 18: Competitive rankings)
+    { id: 'raidleaderboard', type: 'app', title: 'Leaderboard', icon: '🏆', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H * 4, appId: 'raidleaderboard' },
     // Planet Sphere (LAYER 13: CyberNation visualization)
     { id: 'planet', type: 'app', title: 'Planet', icon: '🌍', x: MARGIN_X + GRID_W * 2, y: MARGIN_Y + GRID_H * 5, appId: 'planet' },
     // Market (LAYER 16: Legal & Shadow markets)
-    { id: 'market', type: 'app', title: 'Market', icon: '🛒', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H * 4, appId: 'market' },
+    { id: 'market', type: 'app', title: 'Market', icon: '🛒', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y + GRID_H * 5, appId: 'market' },
     // Tutorial Guide App - Help system with all features walkthrough
     { id: 'tutorial', type: 'app', title: 'Гайд', icon: '📖', x: MARGIN_X + GRID_W * 3, y: MARGIN_Y, appId: 'tutorial' },
     // System folder shortcuts - open StorageApp with initial path
@@ -1244,6 +1247,18 @@ export const Desktop: React.FC<DesktopProps> = (props) => {
                 </div>
                 <div className="flex-1 overflow-hidden">
                     <ServerRoomsApp />
+                </div>
+            </div>
+        )}
+        {/* LAYER 18: Raid Leaderboard - Competitive Rankings */}
+        {activeApp === 'raidleaderboard' && !minimized.includes('raidleaderboard') && (
+            <div className="absolute top-10 left-10 md:left-40 right-10 bottom-20 bg-gray-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-cyan-900">
+                <div className="h-8 bg-gradient-to-r from-yellow-900 to-orange-900 border-b border-yellow-600 flex items-center justify-between px-3">
+                    <div className="text-sm font-bold text-yellow-300">🏆 Raid Leaderboard - Rankings & Stats</div>
+                    <button onClick={() => toggleApp('raidleaderboard')} className="w-3 h-3 rounded-full bg-red-500"></button>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <RaidLeaderboardApp />
                 </div>
             </div>
         )}

@@ -314,4 +314,54 @@ router.get('/raids/rewards/:playerId', async (req: Request, res: Response) => {
   }
 });
 
+// Получить таблицу лидеров рейдов
+router.get('/leaderboard', async (req: Request, res: Response) => {
+  try {
+    const { season = 'current', sort = 'totalLoot' } = req.query;
+
+    // Build leaderboard with aggregated stats
+    const result = await pool.query(`
+      WITH player_raid_stats AS (
+        SELECT 
+          rp.player_id,
+          COUNT(DISTINCT r.id) as raids_completed,
+          COUNT(CASE WHEN r.status = 'completed' THEN 1 END)::float / 
+            NULLIF(COUNT(DISTINCT r.id), 0) as success_rate,
+          COALESCE(SUM(rr.value), 0) as total_loot,
+          MIN(r.duration_limit_seconds - EXTRACT(EPOCH FROM (r.started_at::timestamp - r.created_at::timestamp))::integer) as fastest_time,
+          MAX(sr.difficulty) as highest_difficulty,
+          MAX(r.updated_at) as last_raid_time,
+          u.username as player_name,
+          rp.player_id
+        FROM raid_participants rp
+        JOIN raids r ON rp.raid_id = r.id
+        JOIN server_rooms sr ON r.server_room_id = sr.id
+        LEFT JOIN raid_rewards rr ON rp.player_id = rr.player_id AND r.id = rr.raid_id
+        LEFT JOIN users u ON rp.player_id::text = u.id::text
+        WHERE r.status = 'completed'
+        GROUP BY rp.player_id, u.username
+      )
+      SELECT 
+        ROW_NUMBER() OVER (ORDER BY total_loot DESC) as rank,
+        player_id,
+        player_name,
+        raids_completed,
+        COALESCE(success_rate, 0) as success_rate,
+        total_loot,
+        COALESCE(fastest_time, 0) as fastest_time,
+        COALESCE(highest_difficulty, 'easy') as highest_difficulty,
+        COALESCE(EXTRACT(EPOCH FROM last_raid_time), 0) * 1000 as last_raid_time
+      FROM player_raid_stats
+      WHERE raids_completed > 0
+      ORDER BY total_loot DESC
+      LIMIT 100
+    `);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('[GET /leaderboard]', error);
+    res.status(500).json({ error: 'Failed to fetch leaderboard' });
+  }
+});
+
 export default router;
