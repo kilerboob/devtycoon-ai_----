@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { playSound } from '../utils/sound';
 import { useRaidWebSocket } from '../hooks/useRaidWebSocket';
+import { DataCenter3D } from './DataCenter3D';
 
 interface ServerRoom {
   id: number;
@@ -51,6 +52,7 @@ export default function ServerRoomsApp() {
   const [hackingGame, setHackingGame] = useState<HackingGameState | null>(null);
   const [selectedRaidType, setSelectedRaidType] = useState<'solo' | 'group'>('solo');
   const [raidParticipants, setRaidParticipants] = useState<RaidParticipant[]>([]);
+  const [viewMode, setViewMode] = useState<'ui' | '3d'>('ui');
   const gameLoopRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get player info (mock for now)
@@ -114,7 +116,7 @@ export default function ServerRoomsApp() {
           break;
 
         case 'RAID_LOOT_DROP':
-          playSound('coin');
+          playSound('success');
           console.log(`[Loot] ${event.payload.itemId} (${event.payload.rarity})`);
           break;
 
@@ -415,12 +417,79 @@ export default function ServerRoomsApp() {
     <div className="w-full h-full bg-gradient-to-br from-slate-900 to-black text-white overflow-auto">
       <div className="max-w-7xl mx-auto p-6">
         {/* Заголовок */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-cyan-400 mb-2">🌐 SERVER ROOMS</h1>
-          <p className="text-slate-300">Choose a server to raid and hack</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold text-cyan-400 mb-2">🌐 SERVER ROOMS</h1>
+            <p className="text-slate-300">Choose a server to raid and hack</p>
+          </div>
+          {/* Tab Switcher */}
+          <div className="flex gap-2 bg-slate-800 border border-cyan-500 rounded-lg p-2">
+            <button
+              onClick={() => setViewMode('ui')}
+              className={`px-4 py-2 rounded font-bold transition ${
+                viewMode === 'ui'
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              📋 UI View
+            </button>
+            <button
+              onClick={() => setViewMode('3d')}
+              className={`px-4 py-2 rounded font-bold transition ${
+                viewMode === '3d'
+                  ? 'bg-cyan-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              🏗️ 3D View
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 3D View */}
+        {viewMode === '3d' && selectedRoom && (
+          <div className="bg-slate-800 border border-cyan-500 rounded-lg overflow-hidden h-96 sm:h-screen sm:fixed sm:inset-0 sm:m-0 sm:rounded-none">
+            <div className="w-full h-full">
+              {(() => {
+                const healthValue = userRaid && hackingGame ? Math.max(0, 100 - (hackingGame as any).progress) : 100;
+                const progressValue = hackingGame ? (hackingGame as any).progress : 0;
+                return (
+                  <DataCenter3D
+                    serverId={selectedRoom.id}
+                    serverName={selectedRoom.name}
+                    difficulty={selectedRoom.difficulty}
+                    securityLevel={selectedRoom.security_level}
+                    currentHealth={healthValue}
+                    maxHealth={100}
+                    raidActive={!!userRaid}
+                    hackProgress={progressValue}
+                  />
+                );
+              })()}
+            </div>
+            {/* Info Overlay */}
+            <div className="absolute bottom-4 left-4 bg-black/70 border border-cyan-500 rounded-lg p-4 text-white max-w-xs">
+              <h3 className="text-cyan-400 font-bold mb-2">{selectedRoom.name}</h3>
+              <div className="text-sm space-y-1 text-slate-300">
+                <p>🛡️ Security: {selectedRoom.security_level}/5</p>
+                <p>⚔️ Defense: {selectedRoom.ai_defense_strength}%</p>
+                <p>💰 Reward: ${selectedRoom.base_reward_currency}</p>
+                {userRaid && hackingGame && (
+                  <p>🔓 Hack Progress: {(hackingGame as any).progress}%</p>
+                )}
+              </div>
+              <button
+                onClick={() => setViewMode('ui')}
+                className="mt-3 w-full px-2 py-1 bg-cyan-600 hover:bg-cyan-700 rounded text-sm font-bold transition"
+              >
+                ← Back to UI
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* UI View */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Левая колонка - Список серверов */}
           <div className="lg:col-span-1 space-y-4">
             <div className="bg-slate-800 border border-cyan-500 rounded-lg p-4">
@@ -540,7 +609,8 @@ export default function ServerRoomsApp() {
               </div>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
