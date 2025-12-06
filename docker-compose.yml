@@ -58,7 +58,7 @@ services:
     container_name: devtycoon_frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8088:80"
     depends_on:
       - backend
     networks:
