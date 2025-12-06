@@ -364,4 +364,156 @@ router.get('/leaderboard', async (req: Request, res: Response) => {
   }
 });
 
+// Получить статус защиты сервера
+router.get('/server-rooms/:roomId/defense', async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+
+    const result = await pool.query(`
+      SELECT 
+        sr.id,
+        sr.name,
+        sr.defense_level,
+        sr.defense_health,
+        sr.raid_cooldown_minutes,
+        sr.last_raid_time,
+        COALESCE(sr.defense_cooldown_end > CURRENT_TIMESTAMP, false) as cooldown_active,
+        EXTRACT(EPOCH FROM (sr.defense_cooldown_end - CURRENT_TIMESTAMP)) as cooldown_remaining_seconds,
+        sr.defense_upgrade_cost as next_upgrade_cost,
+        COALESCE(
+          (SELECT jsonb_agg(
+            jsonb_build_object(
+              'type', upgrade_type,
+              'level', level,
+              'effectiveness', effectiveness,
+              'cost', cost
+            )
+          ) FROM server_defense_upgrades WHERE room_id = sr.id),
+          '[]'::jsonb
+        ) as upgrades,
+        (SELECT COUNT(*) FROM defense_events WHERE room_id = sr.id AND event_type = 'raid_blocked') as raids_blocked
+      FROM server_rooms sr
+      WHERE sr.id = $1
+    `, [roomId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Server room not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('[GET /server-rooms/:roomId/defense]', error);
+    res.status(500).json({ error: 'Failed to fetch defense status' });
+  }
+});
+
+// Улучшить защиту сервера
+router.post('/server-rooms/:roomId/upgrade-defense', async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { playerId, upgradeType = 'base' } = req.body;
+
+    // Check server exists and get current defense level
+    const serverResult = await pool.query(
+      'SELECT defense_level, defense_upgrade_cost, controlled_by_faction FROM server_rooms WHERE id = $1',
+      [roomId]
+    );
+
+    if (serverResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Server room not found' });
+    }
+
+    const server = serverResult.rows[0];
+    const upgradeCost = server.defense_upgrade_cost || 50000;
+
+    // TODO: Deduct cost from player's balance (requires player economy integration)
+
+    // Update defense level
+    const newLevel = (server.defense_level || 1) + 1;
+    const newCost = Math.floor(upgradeCost * 1.5); // Exponential cost increase
+
+    await pool.query(
+      `UPDATE server_rooms 
+       SET defense_level = $1, 
+           defense_upgrade_cost = $2,
+           defense_health = LEAST(defense_health + 25, 100),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3`,
+      [newLevel, newCost, roomId]
+    );
+
+    // If upgrading a specific type (firewall, antivirus, etc.)
+    if (upgradeType !== 'base') {
+      const upgradeExists = await pool.query(
+        'SELECT id, level FROM server_defense_upgrades WHERE room_id = $1 AND upgrade_type = $2',
+        [roomId, upgradeType]
+      );
+
+      if (upgradeExists.rows.length > 0) {
+        // Upgrade existing
+        const currentLevel = upgradeExists.rows[0].level;
+        await pool.query(
+          `UPDATE server_defense_upgrades 
+           SET level = $1, 
+               effectiveness = LEAST(effectiveness + 0.1, 1.0),
+               updated_at = CURRENT_TIMESTAMP
+           WHERE room_id = $2 AND upgrade_type = $3`,
+          [currentLevel + 1, roomId, upgradeType]
+        );
+      } else {
+        // Create new upgrade
+        await pool.query(
+          `INSERT INTO server_defense_upgrades (room_id, upgrade_type, level, cost, effectiveness)
+           VALUES ($1, $2, 1, $3, 0.2)`,
+          [roomId, upgradeType, upgradeCost]
+        );
+      }
+    }
+
+    // Log event
+    await pool.query(
+      `INSERT INTO defense_events (room_id, event_type, details)
+       VALUES ($1, 'defense_upgraded', $2)`,
+      [roomId, JSON.stringify({ upgradeType, newLevel, cost: upgradeCost, playerId })]
+    );
+
+    res.json({
+      success: true,
+      newLevel,
+      nextUpgradeCost: newCost,
+      message: `Defense upgraded to level ${newLevel}`
+    });
+  } catch (error) {
+    console.error('[POST /server-rooms/:roomId/upgrade-defense]', error);
+    res.status(500).json({ error: 'Failed to upgrade defense' });
+  }
+});
+
+// Активировать кулдаун защиты после рейда
+router.post('/server-rooms/:roomId/activate-cooldown', async (req: Request, res: Response) => {
+  try {
+    const { roomId } = req.params;
+    const { cooldownMinutes = 30 } = req.body;
+
+    await pool.query(
+      `UPDATE server_rooms 
+       SET last_raid_time = CURRENT_TIMESTAMP,
+           defense_cooldown_end = CURRENT_TIMESTAMP + INTERVAL '${cooldownMinutes} minutes'
+       WHERE id = $1`,
+      [roomId]
+    );
+
+    await pool.query(
+      `INSERT INTO defense_events (room_id, event_type, details)
+       VALUES ($1, 'cooldown_active', $2)`,
+      [roomId, JSON.stringify({ cooldownMinutes })]
+    );
+
+    res.json({ success: true, cooldownEnd: new Date(Date.now() + cooldownMinutes * 60 * 1000) });
+  } catch (error) {
+    console.error('[POST /server-rooms/:roomId/activate-cooldown]', error);
+    res.status(500).json({ error: 'Failed to activate cooldown' });
+  }
+});
+
 export default router;
