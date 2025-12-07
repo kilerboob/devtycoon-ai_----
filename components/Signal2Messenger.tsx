@@ -30,6 +30,28 @@ interface Notification {
   created_at: string;
 }
 
+// Lightweight relative time formatter to avoid external deps
+function formatRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+
+  const minutes = Math.floor(diffSeconds / 60);
+  if (Math.abs(diffSeconds) < 60) return rtf.format(-diffSeconds, 'second');
+
+  const hours = Math.floor(minutes / 60);
+  if (Math.abs(minutes) < 60) return rtf.format(-minutes, 'minute');
+
+  const days = Math.floor(hours / 24);
+  if (Math.abs(hours) < 24) return rtf.format(-hours, 'hour');
+
+  if (Math.abs(days) < 7) return rtf.format(-days, 'day');
+
+  // Fallback to date for older messages
+  return date.toLocaleDateString();
+}
+
 export function Signal2Messenger() {
   // State
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -312,7 +334,7 @@ export function Signal2Messenger() {
                 <div className="flex items-baseline space-x-2">
                   <span className="font-bold text-cyan-400">{msg.sender_name}</span>
                   <span className="text-xs text-gray-500">
-                    {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                    {formatRelativeTime(msg.created_at)}
                   </span>
                   {msg.is_edited && (
                     <span className="text-xs text-gray-600">(edited)</span>
