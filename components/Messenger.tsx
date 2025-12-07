@@ -2,6 +2,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { INITIAL_MESSAGES } from '../constants';
 import { Message, ChatMessage, Email } from '../types';
+import { 
+  Signal2MessengerService, 
+  Signal2Channel, 
+  Signal2Message, 
+  Signal2Guild,
+  Signal2Notification,
+  getSignal2Service 
+} from '../services/Signal2MessengerService';
 
 interface MessengerProps {
   onClose: () => void;
@@ -12,14 +20,40 @@ interface MessengerProps {
   isShadowUnlocked?: boolean;
   username?: string;
   emails?: Email[];
+  userId?: string;
 }
 
-type ViewMode = 'DM' | 'CHANNEL' | 'EMAIL';
+type ViewMode = 'DM' | 'CHANNEL' | 'EMAIL' | 'GUILD';
 
-export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, globalMessages = [], onSendGlobal, isShadowUnlocked = false, username = "Me", emails = [] }) => {
+export const Messenger: React.FC<MessengerProps> = ({ 
+  onClose, 
+  hasUnread, 
+  globalMessages = [], 
+  onSendGlobal, 
+  isShadowUnlocked = false, 
+  username = "Me", 
+  emails = [],
+  userId = "user-" + Math.random().toString(36).substr(2, 9)
+}) => {
   const [viewMode, setViewMode] = useState<ViewMode>('DM');
   
-  // DM State
+  // Signal 2.0 Service
+  const [signal2Service, setSignal2Service] = useState<Signal2MessengerService | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Signal 2.0 State
+  const [channels, setChannels] = useState<Signal2Channel[]>([]);
+  const [guilds, setGuilds] = useState<Signal2Guild[]>([]);
+  const [signal2Messages, setSignal2Messages] = useState<Record<string, Signal2Message[]>>({});
+  const [notifications, setNotifications] = useState<Signal2Notification[]>([]);
+  
+  // Selection State
+  const [activeSignal2Channel, setActiveSignal2Channel] = useState<Signal2Channel | null>(null);
+  const [activeGuild, setActiveGuild] = useState<Signal2Guild | null>(null);
+  
+  // DM State (Legacy)
   const [activeContact, setActiveContact] = useState<string | null>('Mom');
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [showVideo, setShowVideo] = useState(false);
@@ -32,12 +66,83 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
   // Email State
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
 
+  // Initialize Signal 2.0 Service
+  useEffect(() => {
+    const initSignal2 = async () => {
+      try {
+        setLoading(true);
+        const service = getSignal2Service('http://localhost:3000', userId);
+        service.onConnected(setIsConnected);
+        service.onMessage((msg) => {
+          setSignal2Messages(prev => ({
+            ...prev,
+            [msg.channel_id]: [...(prev[msg.channel_id] || []), msg]
+          }));
+        });
+        service.onNotify((notif) => {
+          setNotifications(prev => [...prev, notif]);
+        });
+        
+        await service.initialize();
+        setSignal2Service(service);
+        
+        // Load initial data
+        const channelsData = await service.getChannels();
+        setChannels(channelsData);
+        if (channelsData.length > 0) {
+          setActiveSignal2Channel(channelsData[0]);
+        }
+        
+        const guildsData = await service.getGuilds();
+        setGuilds(guildsData);
+        
+        const notifsData = await service.getNotifications();
+        setNotifications(notifsData);
+      } catch (e) {
+        console.error('Failed to initialize Signal 2.0:', e);
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initSignal2();
+
+    return () => {
+      if (signal2Service) {
+        signal2Service.destroy();
+      }
+    };
+  }, [userId]);
+
+  // Load channel messages when selected
+  useEffect(() => {
+    if (!signal2Service || !activeSignal2Channel) return;
+
+    const loadMessages = async () => {
+      const msgs = await signal2Service.getChannelMessages(activeSignal2Channel.id);
+      setSignal2Messages(prev => ({
+        ...prev,
+        [activeSignal2Channel.id]: msgs
+      }));
+      signal2Service.subscribeToChannel(activeSignal2Channel.id);
+    };
+
+    loadMessages();
+
+    return () => {
+      if (activeSignal2Channel) {
+        signal2Service.unsubscribeFromChannel(activeSignal2Channel.id);
+      }
+    };
+  }, [signal2Service, activeSignal2Channel]);
+
   // Scroll to bottom on new messages
   useEffect(() => {
       if (scrollRef.current) {
           scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
-  }, [messages, globalMessages, activeContact, activeChannel, viewMode]);
+  }, [messages, globalMessages, signal2Messages, activeContact, activeChannel, viewMode]);
 
   // DM Helper: Filter messages
   const filteredDMs = activeContact ? messages.filter(m => m.sender === activeContact || m.sender === 'Me') : [];
@@ -78,6 +183,19 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
       }
   };
 
+  const handleSignal2Send = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signal2Service || !activeSignal2Channel || !chatInput.trim()) return;
+
+    try {
+      await signal2Service.sendMessage(activeSignal2Channel.id, chatInput);
+      setChatInput('');
+    } catch (e) {
+      console.error('Failed to send message:', e);
+      setError('Failed to send message');
+    }
+  };
+
   return (
     <div className="absolute top-10 left-10 right-10 bottom-10 bg-white rounded-lg shadow-2xl flex overflow-hidden animate-in fade-in zoom-in duration-300 font-sans">
        {/* Sidebar */}
@@ -88,6 +206,69 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
            </div>
            
            <div className="flex-1 overflow-y-auto p-2 space-y-6">
+               {/* Section: Signal 2.0 Status */}
+               {signal2Service && (
+                   <div className="bg-green-50 border border-green-200 rounded px-3 py-2 text-xs">
+                       <div className="font-bold text-green-700 flex items-center gap-2">
+                           <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                           Signal 2.0 {isConnected ? 'Connected' : 'Offline'}
+                       </div>
+                       {notifications.filter(n => !n.is_read).length > 0 && (
+                           <div className="text-green-600 mt-1">
+                               {notifications.filter(n => !n.is_read).length} notifications
+                           </div>
+                       )}
+                   </div>
+               )}
+
+               {/* Section: GUILDS */}
+               {guilds.length > 0 && (
+                   <div>
+                       <div className="text-xs font-bold text-slate-400 uppercase px-2 mb-2 flex justify-between items-center">
+                           <span>Guilds</span>
+                           <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-1 rounded">Signal 2.0</span>
+                       </div>
+                       {guilds.map(guild => (
+                           <button
+                               key={guild.id}
+                               onClick={() => { setViewMode('GUILD'); setActiveGuild(guild); }}
+                               className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 ${viewMode === 'GUILD' && activeGuild?.id === guild.id ? 'bg-purple-100 text-purple-800' : 'text-slate-700 hover:bg-slate-200'}`}
+                           >
+                               <span>⚔️</span>
+                               <div className="flex-1 min-w-0">
+                                   <div className="truncate">{guild.name}</div>
+                                   <div className="text-[10px] text-slate-500">
+                                       {guild.member_count} members • Lv {guild.level}
+                                   </div>
+                               </div>
+                           </button>
+                       ))}
+                   </div>
+               )}
+
+               {/* Section: Signal 2.0 CHANNELS */}
+               {channels.length > 0 && (
+                   <div>
+                       <div className="text-xs font-bold text-slate-400 uppercase px-2 mb-2 flex justify-between items-center">
+                           <span>Channels</span>
+                           <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded">Signal 2.0</span>
+                       </div>
+                       {channels.map(channel => (
+                           <button
+                               key={channel.id}
+                               onClick={() => { setViewMode('CHANNEL'); setActiveSignal2Channel(channel); }}
+                               className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 ${viewMode === 'CHANNEL' && activeSignal2Channel?.id === channel.id && !activeGuild ? 'bg-blue-100 text-blue-800' : 'text-slate-700 hover:bg-slate-200'}`}
+                           >
+                               <span className="text-slate-400">#</span>
+                               <div className="flex-1 min-w-0">
+                                   <div className="truncate">{channel.name}</div>
+                                   <div className="text-[10px] text-slate-500">{channel.member_count} members</div>
+                               </div>
+                           </button>
+                       ))}
+                   </div>
+               )}
+               
                {/* Section: INBOX */}
                <div>
                    <button 
@@ -101,7 +282,7 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                    </button>
                </div>
 
-               {/* Section: DIRECT MESSAGES */}
+               {/* Section: DIRECT MESSAGES (Legacy) */}
                <div>
                    <div className="text-xs font-bold text-slate-400 uppercase px-2 mb-2">Direct Messages</div>
                    {['Mom', 'Unknown', 'Alice (HR)'].map(contact => (
@@ -118,35 +299,37 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                    ))}
                </div>
 
-               {/* Section: GLOBAL CHANNELS */}
-               <div>
-                   <div className="text-xs font-bold text-slate-400 uppercase px-2 mb-2">Global Network</div>
-                   <button 
-                        onClick={() => { setViewMode('CHANNEL'); setActiveChannel('general'); }}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 ${viewMode === 'CHANNEL' && activeChannel === 'general' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
-                    >
-                        <span className="text-slate-400">#</span> general
-                    </button>
-                    <button 
-                        onClick={() => { setViewMode('CHANNEL'); setActiveChannel('trade'); }}
-                        className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 ${viewMode === 'CHANNEL' && activeChannel === 'trade' ? 'bg-green-900 text-green-400' : 'text-green-700 hover:bg-green-50'}`}
-                    >
-                        <span className="text-green-500">$</span> trade
-                    </button>
-                    {isShadowUnlocked && (
-                         <button 
-                            onClick={() => { setViewMode('CHANNEL'); setActiveChannel('shadow_net'); }}
-                            className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 border border-transparent ${viewMode === 'CHANNEL' && activeChannel === 'shadow_net' ? 'bg-red-950 text-red-500 border-red-900' : 'text-red-700 hover:bg-red-50'}`}
+               {/* Section: LEGACY GLOBAL CHANNELS */}
+               {!channels.length && (
+                   <div>
+                       <div className="text-xs font-bold text-slate-400 uppercase px-2 mb-2">Global Network</div>
+                       <button 
+                            onClick={() => { setViewMode('CHANNEL'); setActiveChannel('general'); }}
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 ${viewMode === 'CHANNEL' && activeChannel === 'general' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
                         >
-                            <span className="text-red-500">☠</span> shadow_net
+                            <span className="text-slate-400">#</span> general
                         </button>
-                    )}
-               </div>
+                        <button 
+                            onClick={() => { setViewMode('CHANNEL'); setActiveChannel('trade'); }}
+                            className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 ${viewMode === 'CHANNEL' && activeChannel === 'trade' ? 'bg-green-900 text-green-400' : 'text-green-700 hover:bg-green-50'}`}
+                        >
+                            <span className="text-green-500">$</span> trade
+                        </button>
+                        {isShadowUnlocked && (
+                             <button 
+                                onClick={() => { setViewMode('CHANNEL'); setActiveChannel('shadow_net'); }}
+                                className={`w-full text-left px-3 py-2 rounded-md text-sm mb-1 transition-colors flex items-center gap-2 border border-transparent ${viewMode === 'CHANNEL' && activeChannel === 'shadow_net' ? 'bg-red-950 text-red-500 border-red-900' : 'text-red-700 hover:bg-red-50'}`}
+                            >
+                                <span className="text-red-500">☠</span> shadow_net
+                            </button>
+                        )}
+                   </div>
+               )}
            </div>
            
            <div className="p-4 border-t border-slate-200 text-xs text-slate-500 flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Connected as {username}
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
+                Connected as {username} {signal2Service && `| Signal 2.0 ${isConnected ? '✓' : '✗'}`} {signal2Service && signal2Service.getOfflineQueueSize() > 0 && `| ${signal2Service.getOfflineQueueSize()} pending`}
            </div>
        </div>
 
@@ -208,8 +391,79 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                        )}
                    </div>
                </div>
+           ) : viewMode === 'GUILD' ? (
+               // GUILD VIEW (Signal 2.0)
+               <>
+               {/* Guild Header */}
+               <div className="h-14 border-b border-slate-200 bg-gradient-to-r from-purple-500 to-purple-600 flex items-center px-4 justify-between shadow-sm z-10">
+                    <div className="flex items-center gap-3">
+                        <span className="text-2xl">⚔️</span>
+                        <div>
+                            <span className="font-bold text-lg text-white">{activeGuild?.name}</span>
+                            <div className="text-xs text-purple-100">
+                                Lv {activeGuild?.level} • {activeGuild?.member_count} Members • Treasury: {activeGuild?.treasury} 💎
+                            </div>
+                        </div>
+                    </div>
+                    <div className="text-sm text-purple-100">
+                        {isConnected ? '🟢 Live' : '🔴 Offline'}
+                    </div>
+               </div>
+
+               {/* Guild Chat Area */}
+               <div 
+                 ref={scrollRef}
+                 className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50"
+               >
+                   {activeGuild && signal2Messages[activeGuild.id]?.map((msg) => (
+                       <div key={msg.id} className={`flex gap-3 group animate-in slide-in-from-left-1 duration-200 ${msg.sender_id === userId ? 'flex-row-reverse' : ''}`}>
+                           <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center text-xs font-bold text-white ${msg.sender_id === userId ? 'bg-purple-600' : 'bg-slate-500'}`}>
+                               {msg.sender_name[0].toUpperCase()}
+                           </div>
+                           <div className={`flex flex-col max-w-[60%] ${msg.sender_id === userId ? 'items-end' : 'items-start'}`}>
+                               <div className="flex items-center gap-2 mb-0.5">
+                                   <span className={`text-xs font-bold ${msg.sender_id === userId ? 'text-purple-600' : 'text-slate-600'}`}>
+                                       {msg.sender_name}
+                                   </span>
+                                   <span className="text-[10px] text-slate-400">
+                                       {new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                   </span>
+                               </div>
+                               <div className={`px-3 py-2 rounded-lg text-sm shadow-sm ${msg.sender_id === userId ? 'bg-purple-100 text-purple-900' : 'bg-white text-slate-800'}`}>
+                                   {msg.content}
+                               </div>
+                               {msg.mentions.length > 0 && (
+                                   <div className="text-[10px] text-slate-500 mt-1">
+                                       mentions: {msg.mentions.join(', ')}
+                                   </div>
+                               )}
+                           </div>
+                       </div>
+                   ))}
+                   
+                   {(!activeGuild || !signal2Messages[activeGuild.id] || signal2Messages[activeGuild.id].length === 0) && (
+                       <div className="text-center text-slate-400 mt-10 italic opacity-50">Guild is quiet...</div>
+                   )}
+               </div>
+               
+               {/* Guild Input Area */}
+               <div className="p-4 border-t border-slate-200 flex gap-2 bg-white">
+                   <form onSubmit={handleSignal2Send} className="flex gap-2 w-full">
+                        <input 
+                            type="text" 
+                            placeholder={`Message ${activeGuild?.name}...`} 
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            className="flex-1 p-2 rounded border border-slate-300 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-200"
+                        />
+                        <button className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-bold transition-colors">
+                            {loading ? '⏳' : '➤'}
+                        </button>
+                   </form>
+               </div>
+               </>
            ) : (
-               // CHAT INTERFACE (Existing)
+               // CHAT INTERFACE (Updated with Signal 2.0)
                <>
                {/* Header */}
                <div className="h-14 border-b border-slate-200 bg-white flex items-center px-4 justify-between shadow-sm z-10">
@@ -222,10 +476,19 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                         ) : (
                             <>
                                 <span className="text-xl text-slate-500">#</span>
-                                <span className={`font-bold text-lg ${activeChannel === 'shadow_net' ? 'text-red-600' : 'text-slate-800'}`}>{activeChannel}</span>
-                                <span className="text-xs text-slate-500 ml-2 border-l border-slate-300 pl-2">
-                                    {activeChannel === 'general' ? 'Off-topic & Chill' : activeChannel === 'trade' ? 'Buy / Sell / HODL' : 'Encrypted Tunnel'}
-                                </span>
+                                <div>
+                                    <span className={`font-bold text-lg ${activeChannel === 'shadow_net' ? 'text-red-600' : 'text-slate-800'}`}>{activeSignal2Channel?.name || activeChannel}</span>
+                                    {activeSignal2Channel && (
+                                        <div className="text-xs text-slate-500">
+                                            {activeSignal2Channel.member_count} members • Signal 2.0
+                                        </div>
+                                    )}
+                                </div>
+                                {!activeSignal2Channel && (
+                                    <span className="text-xs text-slate-500 ml-2 border-l border-slate-300 pl-2">
+                                        {activeChannel === 'general' ? 'Off-topic & Chill' : activeChannel === 'trade' ? 'Buy / Sell / HODL' : 'Encrypted Tunnel'}
+                                    </span>
+                                )}
                             </>
                         )}
                     </div>
@@ -237,8 +500,13 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                         </div>
                     )}
                     {viewMode === 'CHANNEL' && (
-                        <div className="text-xs text-slate-400">
-                            {Math.floor(Math.random() * 1000) + 50} Online
+                        <div className="text-xs text-slate-400 flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                            {activeSignal2Channel ? (
+                                isConnected ? 'Live' : 'Offline'
+                            ) : (
+                                `${Math.floor(Math.random() * 1000) + 50} Online`
+                            )}
                         </div>
                     )}
                </div>
@@ -246,7 +514,7 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                {/* Messages Area */}
                <div 
                  ref={scrollRef}
-                 className={`flex-1 p-4 overflow-y-auto space-y-4 ${viewMode === 'CHANNEL' && activeChannel === 'shadow_net' ? 'bg-[#111]' : activeChannel === 'trade' ? 'bg-[#f0fdf4]' : 'bg-[#e5ddd5]'}`}
+                 className={`flex-1 p-4 overflow-y-auto space-y-4 ${viewMode === 'CHANNEL' && activeChannel === 'shadow_net' && !activeSignal2Channel ? 'bg-[#111]' : activeChannel === 'trade' && !activeSignal2Channel ? 'bg-[#f0fdf4]' : 'bg-[#e5ddd5]'}`}
                >
                    {/* DM RENDERING */}
                    {viewMode === 'DM' && filteredDMs.map(msg => (
@@ -269,8 +537,44 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                        </div>
                    ))}
 
-                   {/* GLOBAL CHAT RENDERING */}
-                   {viewMode === 'CHANNEL' && filteredGlobal.map((msg, i) => (
+                   {/* SIGNAL 2.0 CHAT RENDERING */}
+                   {viewMode === 'CHANNEL' && activeSignal2Channel && signal2Messages[activeSignal2Channel.id]?.map((msg) => (
+                        <div key={msg.id} className={`flex gap-3 group animate-in slide-in-from-left-1 duration-200 ${msg.sender_id === userId ? 'flex-row-reverse' : ''}`}>
+                            <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center text-xs font-bold text-white ${msg.sender_id === userId ? 'bg-blue-600' : 'bg-slate-500'}`}>
+                                {msg.sender_name[0].toUpperCase()}
+                            </div>
+                            <div className={`flex flex-col max-w-[80%] ${msg.sender_id === userId ? 'items-end' : 'items-start'}`}>
+                                <div className="flex items-center gap-2 mb-0.5">
+                                    <span className={`text-xs font-bold ${msg.sender_id === userId ? 'text-blue-600' : 'text-slate-600'}`}>
+                                        {msg.sender_name}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400">
+                                        {new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                                    </span>
+                                </div>
+                                <div className={`px-3 py-2 rounded-lg text-sm shadow-sm ${msg.sender_id === userId ? 'bg-blue-100 text-blue-900' : 'bg-white text-slate-800'}`}>
+                                    {msg.content}
+                                    {msg.mentions.length > 0 && (
+                                        <div className="text-[10px] text-slate-500 mt-1 opacity-75">
+                                            @{msg.mentions.join(', @')}
+                                        </div>
+                                    )}
+                                </div>
+                                {Object.keys(msg.reactions).length > 0 && (
+                                    <div className="flex gap-1 mt-1 text-xs bg-white px-2 py-1 rounded-full shadow-sm">
+                                        {Object.entries(msg.reactions).map(([emoji, count]) => (
+                                            <span key={emoji} className="hover:cursor-pointer" title={`${count} reactions`}>
+                                                {emoji} {count > 1 ? count : ''}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                   ))}
+
+                   {/* LEGACY GLOBAL CHAT RENDERING */}
+                   {viewMode === 'CHANNEL' && !activeSignal2Channel && filteredGlobal.map((msg, i) => (
                         <div key={i} className={`flex gap-3 group animate-in slide-in-from-left-1 duration-200 ${msg.isMe ? 'flex-row-reverse' : ''}`}>
                             <div className={`w-8 h-8 rounded shrink-0 flex items-center justify-center text-xs font-bold text-white ${msg.isMe ? 'bg-blue-600' : 'bg-slate-500'}`}>
                                 {msg.sender[0]}
@@ -291,18 +595,36 @@ export const Messenger: React.FC<MessengerProps> = ({ onClose, hasUnread, global
                         </div>
                    ))}
                    
-                   {viewMode === 'CHANNEL' && filteredGlobal.length === 0 && (
+                   {viewMode === 'CHANNEL' && !activeSignal2Channel && filteredGlobal.length === 0 && (
                        <div className="text-center text-slate-400 mt-10 italic opacity-50">Channel is quiet...</div>
+                   )}
+                   
+                   {viewMode === 'CHANNEL' && activeSignal2Channel && (!signal2Messages[activeSignal2Channel.id] || signal2Messages[activeSignal2Channel.id].length === 0) && (
+                       <div className="text-center text-slate-400 mt-10 italic opacity-50">Be the first to message...</div>
                    )}
                </div>
                
                {/* Input Area */}
-               <div className={`p-4 border-t border-slate-200 flex gap-2 ${viewMode === 'CHANNEL' && activeChannel === 'shadow_net' ? 'bg-[#1a1a1a] border-slate-800' : 'bg-white'}`}>
+               <div className={`p-4 border-t border-slate-200 flex gap-2 ${viewMode === 'CHANNEL' && activeChannel === 'shadow_net' && !activeSignal2Channel ? 'bg-[#1a1a1a] border-slate-800' : 'bg-white'}`}>
                    {viewMode === 'DM' ? (
                        <>
                            <input type="text" placeholder="Type a private message..." className="flex-1 p-2 rounded border border-slate-300 focus:outline-none focus:border-blue-500" />
                            <button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded font-bold">➤</button>
                        </>
+                   ) : activeSignal2Channel ? (
+                       <form onSubmit={handleSignal2Send} className="flex gap-2 w-full">
+                            <input 
+                                type="text" 
+                                placeholder={`Message #${activeSignal2Channel.name}...`} 
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                                disabled={!isConnected}
+                                className="flex-1 p-2 rounded border border-slate-300 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                            />
+                            <button disabled={!isConnected || loading} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white rounded font-bold transition-colors">
+                                {loading ? '⏳' : '➤'}
+                            </button>
+                       </form>
                    ) : (
                        <form onSubmit={handleGlobalSend} className="flex gap-2 w-full">
                             <input 
